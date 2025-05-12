@@ -243,6 +243,7 @@ def map(m)
         s1type := true
         loud := loudness
         play_alone_consecutive_count := play_alone_consecutive_count() + 1
+        music_playlog.add(m)
 #        spec_band_norm := spec_band_norm_val
 #        notPlayAlone := true
 #        music_centroid := default("800.0", m["dominant_frequency"])
@@ -266,6 +267,7 @@ def map(m)
       notPlayAlone := false
       loud := loudness
       play_alone_consecutive_count := 0
+      music_playlog.add(m)
 #      spec_band_norm := spec_band_norm_val
 #      music_centroid := default("800.0", m["dominant_frequency"])
       #music_now_playing := "#{title} by #{artist}"
