@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>millicent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #e5e4db;
+      }
+      
+      .background-container {
+        position: absolute;
+        left: 0;
+        display: flex;
+        justify-content: center;
+        align-content: center;
+        width: 100vw;
+        height: 100vh;
+        z-index: -1;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center center;
+      }
+
+      .background-image {
+        height: 100vh;
+      }
+
+      .logo-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: flex;
+        align-items: end;
+      }
+      
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .title {
+      	text-align: left;
+      	margin-bottom: 20px;
+      	position: absolute;
+      	left: 0;
+      	margin: 50px;
+      }
+      
+      .cover_art {
+        height:50vh;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      .metadata-boxes {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+        padding: 0 150px;
+        margin-top: 2rem;
+      }
+      
+      .metadata-box {
+        background-color: #2626261a;
+        padding: 20px;
+        border-radius: 5px;
+        flex: 1;
+        text-align: center;
+        border: 2px solid grey;
+        margin: 0.5rem;
+      }
+      .metadata-title {
+        color:rgb(41, 41, 41);
+        font-size: 1.2rem;
+        text-align: left;
+      }
+      .metadata-artist {
+        color: rgb(41, 41, 41);
+        font-size: 1.0rem;
+        text-align: left;
+        padding-left: 5px;
+      }
+      
+      .audio-wrapper {
+        position: relative;
+        padding: 20px;
+        border-radius: 5px;
+        z-index: -2;
+      }
+      
+      #audio-player {
+        width: 100%;
+        display: none;
+      }
+
+      #audio-visualization {
+          width: 100%;
+      }
+
+      .circle {
+          position: fixed;
+          bottom: -200px;
+          right: -200px;
+          width: 400px;
+          height: 400px;
+         /* background-color: #012442;  Circle color */
+          border-radius: 50%;
+          display: flex;
+          justify-content: flex-start;
+          align-items: flex-start;
+          cursor: pointer;
+          z-index: 1000; /* Ensure it's above other content */
+      }
+
+      .play-icon {
+          font-size: 3rem;
+          color: #1c8cb4;
+          filter: grayscale(100%);
+      }
+
+      .hidden {
+          opacity: 0;
+          transition: opacity 1.5s ease;
+      }    
+      
+      .heading {
+        width: 50vw;
+      }
+
+      .heading_container {
+        position: absolute;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        width: 100vw;
+        align-items: center;
+      }
+
+      .controls {
+        position: absolute;
+        right: 2rem;
+        cursor: pointer;
+        z-index: 9999999;
+        display: flex;
+        flex-direction: collumn;
+      }
+
+      .info {
+        font-size: 2rem;
+        margin: 0.5rem 2rem;
+      }
+      
+      .no-image {
+        height: 40px;
+      }
+
+      .playout {
+        position: absolute;
+        bottom: 250px;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        border-left: 2px solid black;
+        border-top: 2px solid black;
+        border-bottom: 2px solid  black;
+        border-radius: 4px;
+        padding-right: 20px;
+        max-width: 250px;
+        max-height: 60vh;
+        overflow: scroll;
+      }
+
+      .playout_item {
+        display: flex;
+        flex-direction: row;
+        list-style-type: none;
+        padding-bottom: 10px;
+        text-decoration: none;
+        color: rgb(41, 41, 41);
+      }
+
+      .song_title {
+        padding-left: 10px;
+        white-space: nowrap; /* Prevents text from wrapping */
+        overflow: hidden;    /* Hides overflow text */
+        text-overflow: ellipsis; /* Adds ellipsis for overflow text */
+        width: 200px; /* Set a fixed width or max-width as needed */
+      }
+
+      .hide {
+        display: none!important;
+      }
+
+      .manifesto-header {
+        margin: 0 auto;
+        background: #e5e4db;
+      }
+
+      .manifesto {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: absolute;
+        top: 0;
+        width: 100vw;
+        margin-bottom: 10rem;
+      }
+
+      .statement-list {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        background: #e5e4db;
+      }
+  
+      .statement {
+        margin: 2rem 0;
+        padding-left: 1rem;
+        font-style: italic;
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeInUp 0.8s forwards;
+      }
+  
+      /* Add staggered animation delays */
+      .statement:nth-child(1) { animation-delay: 0.2s; }
+      .statement:nth-child(2) { animation-delay: 0.4s; }
+      .statement:nth-child(3) { animation-delay: 0.6s; }
+      .statement:nth-child(4) { animation-delay: 0.8s; }
+      .statement:nth-child(5) { animation-delay: 1.2s; }
+      .statement:nth-child(6) { animation-delay: 1.4s; }
+      .statement:nth-child(7) { animation-delay: 1.6s; }
+      .statement:nth-child(8) { animation-delay: 1.8s; }
+      .statement:nth-child(9) { animation-delay: 2s; }
+  
+      .statement:hover {
+        color: #555;
+      }
+  
+      @keyframes fadeInUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      #waveform {
+          display: none;
+          position: absolute;
+          top: 50%; /* Center vertically */
+          left: 0;
+          transform: translateY(-50%); /* Adjust for vertical centering */
+          pointer-events: none; /* Allow clicks to pass through */
+          z-index: -9999; /* Push to the bottom layer */
+          filter: blur(1px)
+      }
+      
+      /* Responsive Styles */
+      @media screen and (max-width: 600px) {
+        body {
+          heigth: 100vh;
+        }
+        .metadata-boxes {
+          flex-direction: column;
+          width: 100vw;
+          padding: 0;
+          margin-top: 0.5rem;
+        }
+      
+        .metadata-box {
+          margin-bottom: 10px;
+        }
+      
+        .audio-wrapper {
+          padding: 10px;
+        }
+        .background-container {
+          width: 100vw;
+        }
+
+        .heading_container {
+          position: relative;
+          margin-top: 2rem;
+        }
+
+        .heading {
+          width: 85vw;
+        }
+
+        .controls {
+          position: fixed;
+          bottom: 2rem;
+          right: 0;
+          width: 100vw;
+          display: flex;
+          justify-content: center;
+          z-index: 999999;
+        }
+
+        .cover_art {
+          height: 23rem;
+          margin: 0.5rem
+        }
+
+        .metadata-title {
+          margin-left: 2%;
+        }
+
+        .metadata-artist {
+          margin-left: 2%;
+          padding-left: 0;
+        }
+
+        .manifesto {
+          margin-top: 7rem;
+        }
+
+      }
+  </style>
+</head>
+<body>
+  <canvas id="waveform"></canvas>
+  <div class="container">
+    <div class="heading_container" style="background-color: ##5f6459">
+      <img class="heading" src="https://millicent.org/static/imgs/millicent_heading.png" />
+      <img class="heading" src="https://millicent.org/static/imgs/rbb_trans.png" />
+    </div>
+    <div class="controls">
+      <i class="fa fa-info info" aria-hidden="true" onclick="view_manifesto()"></i>
+      <div class="play-icon fa fa-play" id="play-button" onclick="playNow()"></div>
+    </div>
+    <div id="playout" class="playout">
+      <h3 style="margin-left: 20px;">Recently Played</h3>
+      <ul id="playout_list" style="list-style-type: none;">
+        {{ range .playout }}
+          <li>
+            <a class="playout_item" href="https://duckduckgo.com/?t=ffab&q={{ .Title }}%20{{ .Artist }}&ia=web" target="_blank">
+              <img src="https://millicent.org/static/covers/{{ .ID }}.jpeg" width="30" height="30" onerror="this.onerror=null; this.src='https://millicent.org/static/covers/default_cover.png';"/></br>
+              <div class="song_title">
+                <strong>{{ .Title }}</strong></br>
+                {{ .Artist }}</br>
+              </div>
+            </a>
+          </li>
+        {{ else }}
+          <li>No recent entries</>
+        {{ end }}
+      </ul>
+    </div>
+    <div class="metadata-boxes">
+      <div class="metadata-box hidden" id="metadata-box-1">-</div>
+      <div class="metadata-box hidden no-image" id="metadata-box-2">-</div>
+      <div class="metadata-box hidden no-image" id="metadata-box-3">-</div>
+    </div>
+    <div id="manifesto" class="manifesto hide">
+      <h2 class="manifesto-header" style="margin-bottom: 0">'millicent' Manifesto</h2> 
+      <section class="statement-list">
+        <p class="statement">1) To view the existence of the internet as a positive opportunity towards the uniting of humanity.</p>
+        <p class="statement">2) To work towards the unity of humanity through the promotion of music, storytelling, poetry and sound design, from all languages and cultures.</p>
+        <p class="statement">3) To promote an existence beyond the barriers constructed through contemporary political notions of national borders, through the medium of radio. </p>
+        <p class="statement">4) To promote a sense of all humanity being equal. Regardless of age, race, gender, ethnicity or geographical location.</p>
+        <p class="statement">5) To respect and promote the further understanding of the importance of the co-existence of differing belief systems.</p>
+        <p class="statement">6) To broadcast, the very best audio quality content, celebrating the rich diversity of humanity’s cultural achievements, and to make this content available to all.</p>
+        <p class="statement">7) To consider cultural diversity a positive asset.</p>
+        <p class="statement">8) To educate, entertain and inform.</p>
+        <p class="statement">9) To celebrate the contribution of the gift of creativity to humanity’s well being. </p>
+      </section>
+    </div>
+  </div>
+  <div class="audio-wrapper">
+    <audio id="audio-player" controls></audio>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    const audio = document.getElementById("audio-player");
+    const playButton = document.getElementById("play-button");
+    const canvas = document.getElementById('waveform');
+    const canvasCtx = canvas.getContext('2d');
+
+    function view_manifesto() {
+      const manifesto = document.getElementById('manifesto');
+
+      if (manifesto.classList.contains('hide')) {
+        manifesto.classList.remove('hide');
+      } else {
+        manifesto.classList.add('hide');
+      }
+    }
+
+    function updatePlayout(item) {
+      console.log(item);
+
+      const playoutList = document.getElementById('playout_list');
+      const existingItems = playoutList.getElementsByTagName('li');
+
+      for (let i = 0; i < existingItems.length; i++) {
+        const existingItem = existingItems[i].querySelector('strong');
+        if (existingItem && existingItem.textContent === item.title) {
+          console.log("Preventing duplicate");
+          return
+        }
+      }
+
+      let newItem = document.createElement('li');
+
+      const a = document.createElement('a');
+      a.className = 'playout_item';
+      a.href = (item.source_url != "") ? item.source_url : 'https://duckduckgo.com/?t=ffab&q=${item.title}%20${artist}&ia=web';
+      a.target = "_blank";
+      
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.width = 30;
+      img.height = 30;
+      img.onerror = function() {
+          this.onerror = null; 
+          this.src = 'https://millicent.org/static/covers/default_cover.png';
+      };
+
+      const div = document.createElement('div');
+      div.className = 'song_title';
+
+      const strong = document.createElement('strong');
+      strong.textContent = item.title;
+
+      const artistText = document.createTextNode(item.artist);
+
+      div.appendChild(strong);
+      div.appendChild(document.createElement('br'));
+      div.appendChild(artistText);
+      div.appendChild(document.createElement('br'));
+
+      a.appendChild(img);
+      a.appendChild(document.createElement('br'));
+      a.appendChild(div);
+
+      newItem.appendChild(a);
+
+
+      if (playoutList.firstElementChild) {
+        playoutList.insertBefore(newItem, playoutList.firstElementChild);
+      } else {
+        playoutList.appendChild(newItem);
+      }
+
+      if (playoutList.children.length > 10) {
+        playoutList.removeChild(playoutList.lastElementChild);
+      }
+    }
+    
+    document.addEventListener("DOMContentLoaded", function () {
+      // Initialize hls.js
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        const metadataBoxes = document.getElementsByClassName("metadata-box");
+        const metadataAndPTS = []; // Array to store received metadata and associated PTS
+        let currentPTS = 0; // Store the current PTS from the stream
+  
+        // Load the HLS stream source
+        hls.loadSource("https://d1i4sik9cp7a6c.cloudfront.net/hls/live.m3u8");
+        hls.attachMedia(audio);
+  
+        // Event listener for "FRAG_PARSING_METADATA" in HLS.js
+        hls.on(Hls.Events.FRAG_PARSING_METADATA, function (event, data) {
+          const metadataText = new TextDecoder("utf-8").decode(data.samples[0].data);
+
+          console.log("Event: " + metadataText.substring(21));
+        
+          // Extract JSON data (assuming a fixed 21-character header)
+          const jsonStr = metadataText.substring(21);
+        
+          try {
+            const parsedData = JSON.parse(jsonStr);
+
+            // Store the received metadata and associated PTS in the array
+            metadataAndPTS.push({ pts: data.samples[0].pts, metadata: parsedData[1] });
+            console.log(metadataAndPTS.length);
+          } catch (error) {
+            console.error("Error parsing JSON from metadata: " + error);
+            console.log(jsonStr);
+          }
+        });
+        
+        // Event listener for "timeupdate" on the audio player
+        audio.addEventListener("timeupdate", function () {
+          const playerTimestamp = audio.currentTime;
+        
+          while (metadataAndPTS.length > 0 && metadataAndPTS[0].pts <= playerTimestamp) {
+            const { pts, metadata } = metadataAndPTS.shift();
+            updateMetadataBoxes(metadata);
+          }
+        });
+  
+        // Helper function to update the text boxes with metadata
+        function updateMetadataBoxes(metadata) {
+          console.log("updating metadata");
+          // Define an array of keys to extract from the metadata
+          const keys = ["music", "field", "vocal"];
+          let td_metadata_arr = [];
+          
+          console.log("metadata at update: "+ metadata)
+ 
+          // Loop through the keys and update the corresponding metadata boxes
+          keys.forEach((key, index) => {
+            console.log("Inloop")
+            const metadataValue = metadata[key];
+            const title = metadataValue.title || 'silence';
+            const artist = metadataValue.artist || 'silence';
+            const source_url = metadataValue.source_url || '';
+            const image = metadataValue.image || '';
+            console.log(source_url);
+            
+            const box = metadataBoxes[index];
+
+            
+            // Update the text content of the box
+            if (title !== 'silence' && artist !== 'silence') {
+              box.innerHTML = `
+              <a style="text-decoration: none; color: black" href="${source_url}" target="_blank">
+                ${key == "music" ? `<div class="cover_art" style="background-image: url(&quot;${image}&quot;);background-size:contain"></div>` : ``}
+                <div class="metadata-title">${title}</div>
+                <div class="metadata-artist">${artist}</div>
+                </a>`;
+              box.classList.remove('hidden');
+              if ( key == "music") {
+                updatePlayout(metadataValue);
+              }
+              td_metadata_arr.push(title, artist);
+            } else {
+              box.classList.add('hidden')
+            }
+          });
+          td_metadata_string = td_metadata_arr.join(",") + ",";
+
+          
+          console.log(`{"message": ${td_metadata_string}`);
+          const res = fetch("http://localhost:9980", {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain",
+            },
+            body: td_metadata_string
+          }
+          );
+        }
+      } else {
+        console.error("HLS.js is not supported in this browser.");
+      }
+
+        // Set up canvas size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Set up audio visualization
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = audioCtx.createAnalyser();
+        const source = audioCtx.createMediaElementSource(audio);
+        
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        // Circle class to manage individual circles
+        class Circle {
+            constructor(x, y, radius, color, index) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.index = index;
+                this.velocityX = (Math.random() - 0.5) * 0.5; // Slow horizontal movement
+                this.velocityY = (Math.random() - 0.5) * 0.5; // Slow vertical movement
+                this.opacity = 0.5; // Initial opacity
+            }
+        
+            draw() {
+                canvasCtx.beginPath();
+                canvasCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        
+                // Adjust color opacity dynamically based on overall volume
+                const dynamicColor = this.color.replace('0.5', this.opacity.toFixed(2)); // Replace static opacity
+                canvasCtx.fillStyle = dynamicColor;
+                canvasCtx.fill();
+                canvasCtx.closePath();
+            }
+        
+            update(volume) {
+                // Use audio data to update radius dynamically
+                this.radius = Math.max(dataArray[this.index] / 10, 1); // Smooth reactivity
+        
+                // Update opacity based on overall volume
+                this.opacity = Math.max(volume / 256, 0.2); // Minimum opacity of 0.2
+        
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+        
+                // Keep circles within canvas bounds
+                if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+                    this.velocityX = -this.velocityX;
+                }
+                if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
+                    this.velocityY = -this.velocityY;
+                }
+        
+                this.draw();
+            }
+        }
+        
+        const circles = [];
+        
+        // Initialize circles with corresponding indices for audio reactivity
+        for (let i = 0; i < bufferLength; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            let color;
+        
+            // Assign colors based on frequency ranges
+            if (i < bufferLength / 3) {
+                color = `rgba(149, 81, 153, 0.5)`; // Blue tones
+            } else if (i < (2 * bufferLength) / 3) {
+                color = `rgba(223, 224, 221, 0.5)`; // Purple tones
+            } else {
+                color = `rgba(243, 241, 6, 0.5)`; // Pink tones
+            }
+        
+            circles.push(new Circle(x, y, 10, color, i));
+        }
+        
+        
+        function updateBlueCircles() {
+            circles.forEach((circle, i) => {
+                if (circle.color.includes('149, 81, 153')) { // Blue circles
+                    circles.forEach((otherCircle, j) => {
+                        if (i !== j && otherCircle.color.includes('149, 81, 153')) {
+                            const dx = circle.x - otherCircle.x;
+                            const dy = circle.y - otherCircle.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+        
+                            if (distance < 50) { // Repulsion threshold
+                                const force = (50 - distance) / 50; // Strength decreases with distance
+                                const angle = Math.atan2(dy, dx);
+                                circle.x += Math.cos(angle) * force;
+                                circle.y += Math.sin(angle) * force;
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        
+        function drawYellowLines() {
+            circles.forEach((circle, i) => {
+                if (circle.color.includes('223,224,221')) { // Yellow circles
+                    circles.forEach((otherCircle, j) => {
+                        if (i !== j && otherCircle.color.includes('223,224,221')) {
+                            const dx = circle.x - otherCircle.x;
+                            const dy = circle.y - otherCircle.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+        
+                            if (distance < 100) { // Connection threshold
+                                const opacity = Math.max(1 - distance / 100, 0.1) * (dataArray[circle.index] / 256); // Adjust opacity
+                                canvasCtx.beginPath();
+                                canvasCtx.moveTo(circle.x, circle.y);
+                                canvasCtx.lineTo(otherCircle.x, otherCircle.y);
+                                canvasCtx.strokeStyle = `rgba(223,224,221, ${opacity.toFixed(2)})`;
+                                canvasCtx.lineWidth = 2;
+                                canvasCtx.stroke();
+                                canvasCtx.closePath();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Update the drawCircles function
+        function drawCircles() {
+            requestAnimationFrame(drawCircles);
+        
+            analyser.getByteFrequencyData(dataArray);
+        
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+        
+            const volume = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+        
+            // Update blue circles with fluid-like interaction
+            updateBlueCircles();
+        
+            // Update and draw all circles
+            circles.forEach(circle => circle.update(volume));
+        
+            // Draw connections for yellow circles
+            drawYellowLines();
+        }
+        
+        audio.addEventListener('play', () => {
+            audioCtx.resume(); // Ensure audio context is running
+            drawCircles();
+        });
+
+
+
+      
+    });
+    function playNow() {
+      if (audio.paused) {
+        audio.play();
+        playButton.classList.remove('fa-play');
+        playButton.classList.add('fa-pause');
+      } else {
+        audio.pause();
+        playButton.classList.remove('fa-pause');
+        playButton.classList.add('fa-play');
+      }
+    }
+  </script>
+
+</body>
+</html>

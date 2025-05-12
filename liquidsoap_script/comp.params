@@ -1,0 +1,71 @@
+{
+  "float": [
+    [
+    "Multiband pre gain (dB)",
+    1.0
+  ],
+    [
+    "knee",
+    0.0
+  ],
+    [
+    "release (ms)",
+    5.8
+  ],
+    [
+    "attack (ms)",
+    100.0
+  ],
+    [
+    "ratio (x:1)",
+    1.7
+  ],
+    [
+    "gain (dB)",
+    1.0
+  ],
+    [
+    "threshold (dB)",
+    -0.1
+  ],
+    [
+    "Vocal Fx mix",
+    0.7
+  ],
+    [
+    "Voacl mix",
+    1.0
+  ],
+    [
+    "Field mix",
+    0.7
+  ],
+    [
+    "Music mix",
+    1.0
+  ],
+    [
+    "field limiter pre-gain (dB)",
+    0.4
+  ],
+    [
+    "field_notch_eq_gain",
+    -1.0
+  ],
+    [
+    "field_notch_eq_q",
+    3.0
+  ],
+    [
+    "field_notch_eq(hz)",
+    720.2
+  ],
+    [
+    "meta delay",
+    90.0
+  ]
+  ],
+  "int": [],
+  "bool": [ [ "Ambient only", false ] ],
+  "string": [ [ "next track decision key", "norm_energy" ] ]
+}

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>millicent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #216477;
+      }
+      
+      .background-container {
+        position: absolute;
+        left: 0;
+        display: flex;
+        justify-content: center;
+        align-content: center;
+        width: 100vw;
+        z-index: -1;
+      }
+
+      .background-image {
+        height: 75vh;
+      }
+
+      .logo-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: flex;
+        align-items: end;
+      }
+      
+      .logo {
+        width: 200px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .title {
+      	text-align: left;
+      	margin-bottom: 20px;
+      	position: absolute;
+      	left: 0;
+      	margin: 50px;
+      }
+      
+      .metadata-boxes {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+      
+      .metadata-box {
+        background-color: #fff;
+        padding: 15px;
+        border-radius: 5px;
+        flex: 1;
+        text-align: center;
+      }
+      
+      .audio-wrapper {
+        position: relative;
+        padding: 20px;
+        border-radius: 5px;
+        z-index: -2;
+      }
+      
+      #audio-player {
+        width: 100%;
+        display: none;
+      }
+
+      #audio-visualization {
+          width: 100%;
+      }
+
+      .circle {
+          position: fixed;
+          bottom: -200px;
+          right: -200px;
+          width: 400px;
+          height: 400px;
+          background-color: #012442; /* Circle color */
+          border-radius: 50%;
+          display: flex;
+          justify-content: flex-start;
+          align-items: flex-start;
+          cursor: pointer;
+          z-index: 1000; /* Ensure it's above other content */
+      }
+
+      .play-icon {
+          font-size: 100px;
+          color: rgb(172, 70, 0); /* Icon color */
+          margin-left: 95px;
+          margin-top: 60px;
+      }
+
+      .hidden {
+          opacity: 0;
+          transition: opacity 1.5s ease;
+      }      
+      /* Responsive Styles */
+      @media screen and (max-width: 600px) {
+        .metadata-boxes {
+          flex-direction: column;
+          align-items: center;
+        }
+      
+        .metadata-box {
+          width: 100%;
+          margin-bottom: 10px;
+        }
+      
+        .audio-wrapper {
+          padding: 10px;
+        }
+
+      }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">millicent dev stream</h1>
+    <div class="background-container">
+      <img class="background-image" src = "static/imgs/millicent_sized_portrait_flutter.png" />
+    </div>
+    <div class="logo-container">
+      <img class="logo" src="static/imgs/millicent_logo_square_notifications.png" />
+    </div>
+    <div class="audio-wrapper">
+      <audio id="audio-player" controls></audio>
+      <canvas id="audio-visualization"></canvas>
+    </div>
+    <div class="metadata-boxes">
+      <div class="metadata-box" id="metadata-box-music">-</div>
+      <div class="metadata-box" id="metadata-box-field">-</div>
+      <div class="metadata-box" id="metadata-box-vocal">-</div>
+    </div>
+    <div class="circle">
+      <div class="btn-container">
+        <div class="play-icon" id="play-button" onclick="playNow()">▶</div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    const audio = document.getElementById("audio-player");
+    const playButton = document.getElementById("play-button");
+    
+    document.addEventListener("DOMContentLoaded", function () {
+      // Initialize hls.js
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        const metadataBoxes = document.getElementsByClassName("metadata-box");
+        const metadataAndPTS = []; // Array to store received metadata and associated PTS
+        let currentPTS = 0; // Store the current PTS from the stream
+  
+        // Load the HLS stream source
+        hls.loadSource("https://d1i4sik9cp7a6c.cloudfront.net/hls/live.m3u8");
+        hls.attachMedia(audio);
+  
+        // Event listener for "hlsFragParsingMetadata"
+        hls.on(Hls.Events.FRAG_PARSING_METADATA, function (event, data) {
+          const metadataText = new TextDecoder("utf-8").decode(data.samples[0].data);
+          const slicemetadataText = metadataText.slice(21);
+          let jsonMetadata = JSON.parse(slicemetadataText);
+          // Ensure we have exactly 3 items in the array (assuming you want 3 metadata items)
+          const finalMetadataArray = jsonMetadata;
+          currentPTS = data.samples[0].pts; // Update the current PTS from the stream
+  
+          // Store the received metadata and associated PTS in the array
+          metadataAndPTS.push({ pts: currentPTS, metadata: finalMetadataArray });
+        });
+  
+        // Event listener for "timeupdate" on the audio player
+        audio.addEventListener("timeupdate", function () {
+          // Get the player's current timestamp (currentTime is in seconds)
+          const playerTimestamp = audio.currentTime; // Convert to milliseconds
+  
+          // Check if there are any metadata with associated PTS that can be updated
+          while (metadataAndPTS.length > 0 && metadataAndPTS[0].pts <= playerTimestamp) {
+            const { pts, metadata } = metadataAndPTS.shift(); // Get the first metadata and PTS pair
+            updateMetadataBoxes(metadata); // Update the metadata divs with the extracted information
+          }
+        });
+  
+        // Helper function to update the text boxes
+        function updateMetadataBoxes(metadataArray) {
+          music = document.getElementById("metadata-box-music");
+          field = document.getElementById("metadata-box-field");
+          vocal = document.getElementById("metadata-box-vocal");
+          music.innerHTML = '<p>' + metadataArray.music.title + '</p><br /><p>' + metadataArray.music.artist + '</p>'
+          field.innerHTML = '<p>' + metadataArray.field.title + '</p><br /><p>' + metadataArray.field.artist + '</p>'
+          vocal.innerHTML = '<p>' + metadataArray.vocal.title + '</p><br /><p>' + metadataArray.vocal.artist + '</p>'
+        }
+      } else {
+        console.error("HLS.js is not supported in this browser.");
+      }
+
+      
+    });
+    function playNow() {
+      if (audio.paused) {
+        audio.play();
+        playButton.innerHTML = '❚❚';
+        playButton.style.marginLeft = '75px';
+        playButton.style.marginTop = '90px';
+        playButton.style.fontSize = '55px';
+      } else {
+        audio.pause();
+        playButton.innerHTML = '▶';
+        playButton.style.marginLeft = '95px';
+        playButton.style.fontSize = '100px';
+        playButton.style.marginTop = '60px';
+      }
+    }
+    if (window.AudioContext || window.webkitAudioContext) {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const aud = document.getElementById("audio-player");
+
+        const source = audioContext.createMediaElementSource(aud);
+
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        source.connect(analyser);
+
+        analyser.connect(audioContext.destination);
+        
+        const canvas = document.getElementById("audio-visualization");
+       //  document.body.appendChild(canvas);
+        const canvasCtx = canvas.getContext('2d');
+        canvas.width = 400;
+        canvas.height = 100;
+
+        function draw() {
+            requestAnimationFrame(draw);
+            analyser.getByteTimeDomainData(dataArray);
+            // Clear the canvas by setting it to transparent
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.fillStyle = 'rgb(33,100,119)';
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                // Draw the audio waveform
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
+            canvasCtx.beginPath();
+            const sliceWidth = canvas.width * 1.0 / bufferLength;
+            let x = 0;
+            for (let i = 0; i < bufferLength; i++) {
+              const v = dataArray[i] / 128.0;
+              const y = v * canvas.height / 2;
+              if (i === 0) {
+                canvasCtx.moveTo(x, y);
+              } else {
+                canvasCtx.lineTo(x, y);
+              }
+              x += sliceWidth;
+            }
+            canvasCtx.lineTo(canvas.width, canvas.height / 2);
+            canvasCtx.stroke();
+        }
+        draw();
+    } else {
+        console.log("Web Audio API is not supported in this browser");
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1F4D5A; /* Petrol blue background */
+            color: #f0f0f0; /* Light text color to contrast with the dark background */
+            line-height: 1.42em;
+        }
+        /* Style for the menu block */
+        nav {
+            background-color: #193B44; /* Darker blue background for the menu */
+            text-align: center;
+            padding: 10px 0;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .menu {
+            list-style: none;
+            padding: 0;
+        }
+
+        .menu li {
+            display: inline;
+            margin: 0 20px;
+        }
+
+        .menu a {
+            text-decoration: none;
+            color: #FFF; /* Text color for menu links */
+            font-weight: bold;
+        }
+
+        .menu a:hover {
+            text-decoration: underline; /* Underline on hover */
+        }
+        h1 {
+            color: #80cbc4; /* A lighter shade of petrol blue for the heading */
+        }
+        form {
+            margin-bottom: 1em;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        table {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            border-collapse: collapse;
+            margin-bottom: 1em;
+        }
+        th, td {
+            border: 1px solid #80cbc4; /* Light petrol blue border */
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #00695c; /* Darker shade of petrol blue for the table header */
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            /* On small screens, make the table take up the full width of the screen */
+            table {
+                width: 100%;
+                max-width: 700px;
+            }
+            .container {
+                max-width: 700px;
+            }
+        }
+    </style>
+</head>
+<body>
+	<!-- Menu section -->
+    <nav>
+        <ul class="menu">
+            <li><a href="/admin">File Browser</a></li>
+            <li><a href="/upload">Upload</a></li>
+            <li><a href="/stats">Stats</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h1>Upload Multiple Files</h1>
+        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="files" accept=".mp3" multiple>
+            <input type="submit" value="Upload Files">
+        </form>
+    </div>
+    <table id="fileStatusTable">
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="fileStatusBody">
+        </tbody>
+    </table>
+
+    <script>
+        const form = document.getElementById("uploadForm");
+        const fileStatusBody = document.getElementById("fileStatusBody");
+
+        form.elements.files.addEventListener("change", function (e) {
+            // Clear the table body
+            fileStatusBody.innerHTML = "";
+
+            // Add a new row to the table for each file
+            Array.from(e.target.files).forEach(file => {
+                const row = fileStatusBody.insertRow();
+                row.insertCell().textContent = file.name;
+                row.insertCell().textContent = "Queued";
+            });
+        });
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const files = form.elements.files.files;
+
+            Array.from(files).reduce(async (previousPromise, file, index) => {
+                await previousPromise;
+
+                // Update the status to "Processing"
+                fileStatusBody.rows[index].cells[1].textContent = "Processing";
+
+                const formData = new FormData();
+                formData.append("file", file);
+
+                return fetch("/upload", {
+                    method: "POST",
+                    body: formData,
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Process the individual response
+                    if (data.message === "File uploaded") {
+                        fileStatusBody.rows[index].cells[1].textContent = "Success";
+                    } else {
+                        fileStatusBody.rows[index].cells[1].textContent = "Failed";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    fileStatusBody.rows[index].cells[1].textContent = "Failed";
+                });
+            }, Promise.resolve());
+        });
+    </script>
+</body>
+</html>

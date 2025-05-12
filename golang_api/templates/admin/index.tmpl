@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+    <head>
+	    <link rel="stylesheet" href="/static/css/styles.css">
+		<title>millicent Files</title>
+		<style>
+		    /* Styling for the overall page */
+            body {
+                background-color: #1F4D5A; /* Petrol blue background */
+                color: #FFF; /* Text color */
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                margin: 0;
+                line-height: 1.42em;
+            }
+
+			/* Style for the menu block */
+            nav {
+                background-color: #193B44; /* Darker blue background for the menu */
+                text-align: center;
+                padding: 10px 0;
+            }
+    
+            .menu {
+                list-style: none;
+                padding: 0;
+            }
+    
+            .menu li {
+                display: inline;
+                margin: 0 20px;
+            }
+    
+            .menu a {
+                text-decoration: none;
+                color: #FFF; /* Text color for menu links */
+                font-weight: bold;
+            }
+    
+            .menu a:hover {
+                text-decoration: underline; /* Underline on hover */
+            }
+            
+            /* Style for the h1 element */
+            h1 {
+                text-align: left;
+                color: #80cbc4;
+                font-weight: bold;
+            }
+            
+            /* Style for the pagination section */
+            .pagination {
+                margin: 20px 0;
+            }
+            
+            /* Style for pagination links */
+            .pagination a {
+                text-decoration: none;
+                color: #FFF; /* Text color for pagination links */
+                background-color: #F35A5A; /* Red background for pagination links */
+                padding: 5px 10px;
+                margin: 0 5px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            
+            /* Style for current page link */
+            .pagination span {
+                color: #F35A5A; /* Red color for the current page */
+                background-color: #FFF; /* White background for the current page */
+                padding: 5px 10px;
+                margin: 0 5px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+
+			.table-container {
+			    width: 100%;
+				max-width: 1200px;
+                margin: 0 auto;
+			}
+            
+            /* Styling for the table */
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            
+            /* Style for table rows */
+            .table tr:nth-child(odd):not(:first-child) {
+                background-color: #193B44; /* Lighter blue background for table rows */
+                //display: none;
+            }
+
+            .table tr:nth-child(even):not(:first-child) {
+                background-color: #082A33; /* Darker blue background for table rows */
+            }
+            
+            /* Style for table cells */
+            .table td {
+                padding: 10px;
+                border: 1px solid #1F4D5A; /* Petrol blue border for table cells */
+            }
+			/* Define fixed column widths */
+            .table td:nth-child(1) {
+                width: 5%%; /* 20% width for the first column */
+            }
+
+            .table td:nth-child(2) {
+                width: 30%; /* 20% width for the first column */
+            }
+            
+            .table td:nth-child(3) {
+                width: 30%; /* 30% width for the second column */
+            }
+            
+            .table td:nth-child(4) {
+                width: 15%; /* 15% width for the third column */
+            }
+            
+            .table td:nth-child(5) {
+                width: 15%; /* 35% width for the fourth column */
+            }
+
+            .table td:nth-child(6) {
+                width: 5%; /* 35% width for the fifth column */
+            }
+
+            /* Style for table rows */
+            .table tr:not(:first-child) {
+                display: none;
+            }
+    
+            .table tr.visible {
+                display: table-row;
+            }
+            
+            /* Media query for responsiveness */
+            @media (max-width: 768px) {
+                /* Styles for smaller screens */
+                .pagination a, .pagination span {
+                    font-size: 14px;
+                }
+			    .table-container {
+				    max-width: 700px;
+                    margin: 0 auto;
+			    }
+            }
+		</style>
+	</head>
+	<body>
+	<div class="table-container">
+	    <!-- Menu section -->
+        <nav>
+            <ul class="menu">
+                <li><a href="/admin">File Browser</a></li>
+                <li><a href="/adminUpload">Upload</a></li>
+                <li><a href="/stats">Stats</a></li>
+            </ul>
+        </nav>
+	    <h1>
+	    	{{ .title }}
+	    </h1>
+    
+	    {{ $data := .data }}
+    
+        <div class="pagination">
+            <a id="firstPageLink">First</a>
+            <a id="prevPageLink" data-prev-page="{{  .previousPage  }}">Previous</a>
+            <span>Page {{ .currentPage }}</span>
+            <a id="nextPageLink" data-next-page="{{ .nextPage }}">Next</a>
+
+            <span>Show: </span>
+            <select id="streamFilter" onchange="changeFilter()">
+                <option value="all">All</option>
+                <option value="music">Music</option>
+                <option value="noise">Field</option>
+                <option value="vocal">Vocal</option>
+            </select>
+
+            <select id="itemsPerPage" onchange="changeFilter()">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    
+	    <table class="table">
+            <tr>
+              <th>info</th>
+              <th>Title</th>
+              <th>Artist</th>
+              <th>Stream</th>
+              <th>Genre</th>
+              <th>Remove</th>
+            </tr>
+	    	{{ range $data := $data }}
+        	    <tr class="visible">
+                    <td onclick="openNextRow(this)"><button>⬙</button></td>
+	    		    <td> <input value="{{ $data.Title }}" type="text" onchange="updateOnChange({{ $data.ID }}, 'title', this.value)"></input> </td>
+	    		    <td> <input value="{{ $data.Artist }}" type="text" onchange="updateOnChange({{ $data.ID }}, 'title', this.value)"></input> </td>
+	    		    <td> 
+	    			    <select name="stream" id="stream" onchange="updateOnChange({{ $data.ID }}, 'stream_2', this.value)">
+                            {{ if eq $data.Stream_2 "music" }}
+                            <option value="music" selected>Music</option>
+                            {{ else }}
+                            <option value="music">Music</option>
+                            {{ end }}
+                        
+                            {{ if eq $data.Stream_2 "noise" }}
+                            <option value="noise" selected>Field</option>
+                            {{ else }}
+                            <option value="noise">Field</option>
+                            {{ end }}
+                        
+                            {{ if eq $data.Stream_2 "vocal" }}
+                            <option value="vocal" selected>Vocal</option>
+                            {{ else }}
+                            <option value="vocal">Vocal</option>
+                            {{ end }}     
+    
+                            {{ if eq $data.Stream_2 "notset" }}
+                            <option value="notset" selected>notset</option>
+                            {{ else }}
+                            <option value="notset">notset</option>
+                            {{ end }}
+                        </select>
+	    			</td>
+	    		    <td> 
+	    			    <select name="mix_type" id="mix_type" onchange="updateOnChange({{ $data.ID }}, mix_type', this.value)">
+                            {{ if eq $data.MixType "Mix" }}
+                            <option value="Mix" selected>Mix</option>
+                            {{ else }}
+                            <option value="Mix">Mix</option>
+                            {{ end }}
+                        
+                            {{ if eq $data.MixType "Play alone" }}
+                            <option value="Play alone" selected>Play alone</option>
+                            {{ else }}
+                            <option value="Play alone">Play alone</option>
+                            {{ end }}
+                        </select>
+                    </td>
+                    <td><button onclick="deleteItem({{ $data.ID }})" >delete</button>
+	    		</tr>
+                <tr class="details">
+                    <td> {{ $data.ID }} </td>
+                    <td> Genre: {{ $data.Style }} </td>
+                    <td> Last Played: {{ $data.LastPlayed }} </td>
+                    <td> Processed: <input type="checkbox" {{ if $data.Processed }}checked{{ end }} onchange="updateOnChange( {{ $data.ID }}, 'Processed', this.checked)"></td>
+                    <td> Curated: <input type="checkbox" {{ if $data.Currated }}checked{{ end }} onchange="updateOnChange( {{ $data.ID }}, 'Currated', this.checked)"></td>
+                </tr>
+	    	{{end}}
+	    </table>
+    
+	    <script>
+        base_url = "https://millicent.org"
+        // Check if there's a stored value for itemsPerPage and set the select box accordingly
+        window.addEventListener('load', () => {
+            // Get stored values if any.
+            const storedValue = sessionStorage.getItem('itemsPerPage');
+            const storedStream = sessionStorage.getItem('stream');
+
+            // Set options dropdowns to stored values if any.
+            const select = document.getElementById("itemsPerPage");
+            if (storedValue) {
+                select.value = storedValue;
+            }
+            
+            const streamFilter = document.getElementById("streamFilter");
+            if (storedStream) {
+                streamFilter.value = storedStream;
+            }
+
+            const perPage = select.value;
+            const stream = streamFilter.value;
+
+            // Set url for first page link.
+            const firstPageLink = document.querySelector('#firstPageLink');
+            firstPageLink.href = `?page=1&per_page=${perPage}&stream=${stream}`;
+
+            // Set url for next page link.
+            const nextPageLink = document.querySelector('#nextPageLink');
+            const nextPage = nextPageLink.getAttribute('data-next-page');
+            nextPageLink.href = `?page=${nextPage}&per_page=${perPage}&stream=${stream}`;
+
+            // Set url for prev page link.
+            const prevPageLink = document.querySelector('#prevPageLink');
+            const prevPage = prevPageLink.getAttribute('data-prev-page');
+            prevPageLink.href = `?page=${prevPage}&per_page=${perPage}&stream=${stream}`;
+        });
+
+        function openNextRow(button) {
+            const currentRow = button.parentNode;
+            const nextRow = currentRow.nextElementSibling;
+
+            if (nextRow && nextRow.classList.contains('details')) {
+                nextRow.classList.toggle('visible');
+            }
+        }
+
+        function deleteItem(id) {
+            var d = `{"id": "${id}"}`
+            fetch(`${base_url}/content/${id}`, {
+              method: 'DELETE',
+              })
+              .then(response => {
+                  // Check if the response status is successful (2xx)
+                  if (response.ok) {
+                      // Reload the page after the DELETE request is successful
+                      location.reload();
+                  } else {
+                      // Handle errors or other response statuses if needed
+                      console.error('Failed to delete content:', response.status);
+                  }
+              })
+              .catch(error => {
+                  // Handle fetch errors
+                  console.error('Error during DELETE request:', error);
+              });
+        }
+
+        function changeFilter() {
+            const select = document.getElementById("itemsPerPage");
+            const streamFilter = document.getElementById("streamFilter");
+
+            // Get the values from the select options.
+            const stream = streamFilter.options[streamFilter.selectedIndex].value;
+            const selectedValue = select.options[select.selectedIndex].value;
+
+            const currentPage = {{ .currentPage }}; // Get the current page value from the template
+
+            // Store the selected values in local storage
+            sessionStorage.setItem('itemsPerPage', selectedValue); 
+            sessionStorage.setItem('stream', stream);
+                 
+            // Redirect to the same page with the new items per page value
+            window.location.href = `?page=${currentPage}&per_page=${selectedValue}&stream=${stream}`;
+        }
+
+        function updateOnChange(id, key, value) {
+            var d = `{"${key}": "${value}"}`
+            console.log(d);
+            fetch(`${base_url}/content/${id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                // Add any other headers as needed
+              },
+              body: d,
+              })
+              .then(response => {
+                  // Check if the response status is successful (2xx)
+                  if (response.ok) {
+                      // Reload the page after the PUT request is successful
+                      location.reload();
+                  } else {
+                      // Handle errors or other response statuses if needed
+                      console.error('Failed to update content:', response.status);
+                  }
+              })
+              .catch(error => {
+                  // Handle fetch errors
+                  console.error('Error during DELETE request:', error);
+              });
+        }
+        </script>
+	</div>
+
+	</body>
+</html>
+
+
