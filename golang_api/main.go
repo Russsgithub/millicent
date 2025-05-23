@@ -811,7 +811,7 @@ func isValidQueryParam(param string) bool {
 		"title":    {},
 		"artist":   {},
 		"stream":   {},
-		"genre":    {},
+		"style":    {},
 		"stream_2": {},
 		// ... other allowed parameters
 	}
