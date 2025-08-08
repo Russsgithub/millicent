@@ -31,6 +31,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"golang_api/models"
+
 	"github.com/dhowden/tag"
 )
 
@@ -39,24 +41,6 @@ import (
 type Conf struct {
 	gorm.Model
 	NoRepeatTime string `json:"no_repeat_time"`
-}
-
-type User struct {
-	gorm.Model
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// Validate User item
-func (c User) Validate() error {
-	// Add your validation rules here
-	if c.Username == "" {
-		return errors.New("title is required")
-	}
-	if c.Password == "" {
-		return errors.New("artist is required")
-	}
-	return nil
 }
 
 type Content struct {
@@ -133,7 +117,7 @@ func main() {
 	fmt.Println("Database connection established")
 
 	// Migrate one model at a time
-	if err := db.AutoMigrate(&User{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}); err != nil {
 		log.Fatalf("Automigrate error for User: %v", err)
 	}
 	fmt.Println("User model migrated successfully")
@@ -152,12 +136,12 @@ func main() {
 
 	// Check if the User table has any records
 	var userCount int64
-	db.Model(&User{}).Count(&userCount)
+	db.Model(&models.User{}).Count(&userCount)
 
 	// Check there is a default user
 	if userCount == 0 {
 		// No users found, create a default user
-		defaultUser := User{
+		defaultUser := models.User{
 			Username: "control",
 			Password: "m1ll1c3nt",
 		}
@@ -1122,7 +1106,7 @@ func contains(entries []Content, entry Content) bool {
 
 // getUsers respond with list of users in as json
 func getUsers(c *gin.Context) {
-	var users []User // Define a slice to hold User structs
+	var users []models.User // Define a slice to hold User structs
 
 	result := db.Find(&users)
 	if result.Error != nil {
@@ -1135,7 +1119,7 @@ func getUsers(c *gin.Context) {
 
 // postUsers add user from json recieved in request body
 func postUsers(c *gin.Context) {
-	var newUser User // Define a User struct
+	var newUser models.User // Define a User struct
 
 	if err := c.BindJSON(&newUser); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1162,7 +1146,7 @@ func postUsers(c *gin.Context) {
 func getUserByID(c *gin.Context) {
 	id := c.Param("id")
 
-	var user User // Define a User struct
+	var user models.User // Define a User struct
 
 	err := db.First(&user, id).Error
 	if err != nil {
@@ -1191,7 +1175,7 @@ func BasicAuthMiddleware(handler gin.HandlerFunc) gin.HandlerFunc {
 }
 
 func checkUsernameAndPassword(username, password string) bool {
-	var user User // Define a User struct
+	var user models.User // Define a User struct
 
 	err := db.Where("username = ? AND password = ?", username, password).First(&user).Error
 	if err != nil {
