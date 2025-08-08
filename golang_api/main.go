@@ -38,10 +38,7 @@ import (
 
 // remove space from replay gain
 // db content to only include needed columns (json keys) remove the others
-type Conf struct {
-	gorm.Model
-	NoRepeatTime string `json:"no_repeat_time"`
-}
+
 
 var db *gorm.DB
 
@@ -82,7 +79,7 @@ func main() {
 	}
 	fmt.Println("Content model migrated successfully")
 
-	if err := db.AutoMigrate(&Conf{}); err != nil {
+	if err := db.AutoMigrate(&models.Conf{}); err != nil {
 		log.Fatalf("Automigrate error for Conf: %v", err)
 	}
 	fmt.Println("Conf model migrated successfully")
@@ -109,12 +106,12 @@ func main() {
 	}
 
 	var confCount int64
-	db.Model(&Conf{}).Count(&confCount)
+	db.Model(&models.Conf{}).Count(&confCount)
 	if confCount > 1 {
-		db.Where("id Not IN (?)", db.Model(&Conf{}).Select("id").Limit(1).Delete(&Conf{}))
+		db.Where("id Not IN (?)", db.Model(&models.Conf{}).Select("id").Limit(1).Delete(&models.Conf{}))
 		fmt.Println("Cleared extra entries in the conf table")
 	} else if confCount == 0 {
-		db.Create(&Conf{NoRepeatTime: "18"})
+		db.Create(&models.Conf{NoRepeatTime: "18"})
 		fmt.Println("Added no repeat time default to conf table")
 	}
 
@@ -198,7 +195,7 @@ func admin(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	var conf Conf
+	var conf models.Conf
 	result := db.First(&conf)
 
 	if result.Error != nil {
@@ -840,7 +837,7 @@ func getNext(c *gin.Context) {
 	}
 
 	// Get no repeat time from conf table
-	var conf Conf
+	var conf models.Conf
 	result := db.First(&conf)
 	if result.Error != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
