@@ -1,4 +1,9 @@
-package: models
+package models
+
+import (
+	"errors"
+	"gorm.io/gorm"
+)
 
 type User struct {
 	gorm.Model

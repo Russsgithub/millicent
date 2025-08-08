@@ -31,7 +31,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"golang_api/models"
+	"work/golang_api/models"
 
 	"github.com/dhowden/tag"
 )
@@ -41,51 +41,6 @@ import (
 type Conf struct {
 	gorm.Model
 	NoRepeatTime string `json:"no_repeat_time"`
-}
-
-type Content struct {
-	gorm.Model
-	Title               string    `json:"title" gorm:"default:'unknown'"`
-	Artist              string    `json:"artist" gorm:"default:'unknonw'"`
-	Url                 string    `json:"url"`
-	SourceUrl           string    `json:"source_url"`
-	PlayCount           string    `json:"play_count" gorm:"default:'1'"`
-	Energy              string    `json:"energy"`
-	NormEnergy          string    `json:"norm_energy"`
-	Key                 string    `json:"key"`
-	Centroid            string    `json:"centroid"`
-	NormCentroid        string    `json:"norm_centroid"`
-	ReplaygainTrackGain string    `json:"replaygain_track_gain"`
-	ReplaygainTrackPeak string    `json:"replaygain_track_peak"`
-	Offset              string    `json:"liq_on_offset" gorm:"column:liq_on_offset"`
-	Stream              string    `json:"stream"`
-	Stream_2            string    `json:"stream_2"`
-	MixType             string    `json:"mix_type"`
-	Style               string    `json:"style"`
-	LastPlayed          time.Time `json:"last_played"`
-	SpecFlatnessNorm    string    `json:"spec_flatness_norm"`
-	YamnetEmbeddings    []byte    `json:"yamnet_embedding" grom:"type:blob"`
-	PCA1D               float64   `json:"pca_1d"`
-	IntensityStep       int       `json:"intersity_step"`
-	Duration            string    `json:"duration"`
-	Processed           string    `json:"processed"`
-	Currated            string    `json:"currated"`
-}
-
-// Validate Content item
-func (c Content) Validate() error {
-	fmt.Println("validating")
-	// Add your validation rules here
-	if c.Title == "" {
-		return errors.New("Title is required")
-	}
-	if c.Artist == "" {
-		return errors.New("Artist is required")
-	}
-	if c.Url == "" {
-		return errors.New("Url is required")
-	}
-	return nil
 }
 
 var db *gorm.DB
@@ -122,7 +77,7 @@ func main() {
 	}
 	fmt.Println("User model migrated successfully")
 
-	if err := db.AutoMigrate(&Content{}); err != nil {
+	if err := db.AutoMigrate(&models.Content{}); err != nil {
 		log.Fatalf("Automigrate error for Content: %v", err)
 	}
 	fmt.Println("Content model migrated successfully")
@@ -199,7 +154,7 @@ func main() {
 }
 
 // Slice containing the last 10 played music tracks
-var recentlyPlayed []Content
+var recentlyPlayed []models.Content
 
 func home(c *gin.Context) {
 	c.HTML(http.StatusOK, "home.tmpl", gin.H{
@@ -455,8 +410,8 @@ func suggestedSearch(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"suggestions": suggestions})
 }
 
-func fetchSuggestions(query string) ([]Content, error) {
-	var items []Content
+func fetchSuggestions(query string) ([]models.Content, error) {
+	var items []models.Content
 
 	result := db.Where("title LIKE ?", "%"+query+"%").Find(&items)
 	if result.Error != nil {
@@ -466,12 +421,12 @@ func fetchSuggestions(query string) ([]Content, error) {
 	return items, nil
 }
 
-func extractAudioData(fn string, newFilename string) (Content, error) {
+func extractAudioData(fn string, newFilename string) (models.Content, error) {
 	fmt.Println("Opening file")
 	file, err := os.Open(fn)
 	if err != nil {
 		fmt.Printf("There was an error opening the file: %s", err)
-		return Content{}, err
+		return models.Content{}, err
 	}
 	defer file.Close()
 
@@ -480,7 +435,7 @@ func extractAudioData(fn string, newFilename string) (Content, error) {
 	metadata, err := tag.ReadFrom(file)
 	if err != nil {
 		fmt.Printf("There was an error opening the file: %s", err)
-		return Content{}, err
+		return models.Content{}, err
 	}
 
 	title := metadata.Title()
@@ -542,15 +497,15 @@ func extractAudioData(fn string, newFilename string) (Content, error) {
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("Error:", err)
-		return Content{}, err
+		return models.Content{}, err
 	}
 
 	fmt.Printf("Outptut: %s", output)
 
-	var content Content
+	var content models.Content
 	err = json.Unmarshal(output, &content)
 	if err != nil {
-		return Content{}, err
+		return models.Content{}, err
 	}
 
 	delimiter := "/"
@@ -610,7 +565,7 @@ func upload(c *gin.Context) {
 	// Split this to extract one feature with one call to the py script.
 
 	// New using goroutines
-	contentChan := make(chan Content)
+	contentChan := make(chan models.Content)
 	errChan := make(chan error)
 
 	go func() {
@@ -622,7 +577,7 @@ func upload(c *gin.Context) {
 		contentChan <- content
 	}()
 
-	var content Content
+	var content models.Content
 
 	select {
 	case content = <-contentChan:
@@ -657,7 +612,7 @@ func upload(c *gin.Context) {
 func getContentByID(c *gin.Context) {
 	id := c.Param("id")
 
-	var content Content
+	var content models.Content
 	err := db.First(&content, id).Error
 
 	if err != nil {
@@ -672,15 +627,15 @@ func getContentByID(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, content)
 }
 
-func getItemfromDb(id string) (Content, error) {
-	var content Content
+func getItemfromDb(id string) (models.Content, error) {
+	var content models.Content
 	err := db.First(&content, id).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return Content{}, err
+			return models.Content{}, err
 		}
-		return Content{}, err
+		return models.Content{}, err
 	}
 
 	return content, nil
@@ -697,7 +652,7 @@ func deleteContentByID(c *gin.Context) {
 		return
 	}
 
-	result := db.Delete(&Content{}, id)
+	result := db.Delete(&models.Content{}, id)
 	if result.Error != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": result.Error})
 		return
@@ -750,8 +705,8 @@ func getContents(c *gin.Context) {
 
 // getContent gets the content from the content database as json
 // TODO return all columns not just 4
-func getContent(limit int, offset int, filterField string, filterValue string) ([]Content, error) {
-	var contents []Content
+func getContent(limit int, offset int, filterField string, filterValue string) ([]models.Content, error) {
+	var contents []models.Content
 	query := db.Limit(limit).Offset(offset) // Use := for variable initialization
 
 	// Apply filtering only if filterField and filterValue are provided
@@ -780,7 +735,7 @@ func getContentWhere(c *gin.Context) {
 		query[key] = value[0]
 	}
 
-	var contents []Content
+	var contents []models.Content
 
 	// Use GORM's Where method with the query map
 	result := db.Where(query).Find(&contents)
@@ -838,7 +793,7 @@ func getNext(c *gin.Context) {
 
 	// Build GORM query with conditions
 	// Assuming a configured GORM instance
-	query := db.Model(&Content{})
+	query := db.Model(&models.Content{})
 
 	for key, value := range params {
 		if valueStr, ok := value.(string); ok && valueStr != "" {
@@ -910,7 +865,7 @@ func getNext(c *gin.Context) {
 
 	// Apply weighted randomization logic (using a separate library like "github.com/cespare/weightedrand")
 	// fix this
-	var contents []Content
+	var contents []models.Content
 	result = query.Order("RANDOM()").Find(&contents) // Assuming a way to populate choices with weighted content
 	if result.Error != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
@@ -918,7 +873,7 @@ func getNext(c *gin.Context) {
 	}
 
 	var maxPlaycountInDb int
-	db.Model(&Content{}).Select("MAX(play_count)").Scan(&maxPlaycountInDb)
+	db.Model(&models.Content{}).Select("MAX(play_count)").Scan(&maxPlaycountInDb)
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -955,7 +910,7 @@ func getNext(c *gin.Context) {
 		return
 	}
 
-	choice := chooser.Item.(Content)
+	choice := chooser.Item.(models.Content)
 
 	if choice.LastPlayed.After(pastTime) {
 		fmt.Printf("\033[31mFile last picked on: %s\033[0m\n\n", choice.LastPlayed.Format("2006-01-02 15:04:05"))
@@ -981,7 +936,7 @@ func getNext(c *gin.Context) {
 // / TODO remove duplicate keys in json inside the go code raher than out sourcing to the python migrate script
 // / TODO Use uuid to create id don't use increment
 func postContent(c *gin.Context) {
-	var newContent Content // Use the Content struct
+	var newContent models.Content // Use the Content struct
 
 	if err := c.ShouldBindJSON(&newContent); err != nil {
 		fmt.Println("Json bind error")
@@ -1060,7 +1015,7 @@ func patchContent(c *gin.Context) {
 	}
 
 	// Use GORM's Model and Updates methods
-	result := db.Model(&Content{}).Where("id = ?", id).Updates(updatedContent)
+	result := db.Model(&models.Content{}).Where("id = ?", id).Updates(updatedContent)
 	if result.Error != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
@@ -1071,7 +1026,7 @@ func patchContent(c *gin.Context) {
 		return
 	}
 	// Retrieve item from the database
-	var updatedEntry Content
+	var updatedEntry models.Content
 	if err := db.First(&updatedEntry, id).Error; err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve the updated entry"})
 		return
@@ -1079,7 +1034,7 @@ func patchContent(c *gin.Context) {
 
 	// Prepend music and vocal tracks to recentlyPlayed slice by adding old to the end of new slice
 	if !contains(recentlyPlayed, updatedEntry) && (updatedEntry.Stream_2 == "music" || updatedEntry.Stream_2 == "vocal") {
-		recentlyPlayed = append([]Content{updatedEntry}, recentlyPlayed...)
+		recentlyPlayed = append([]models.Content{updatedEntry}, recentlyPlayed...)
 	}
 
 	// Keep list at 10 entries max
@@ -1095,7 +1050,7 @@ func lastPlayed(c *gin.Context) {
 }
 
 // Helper function to check if the entry already exists in the list
-func contains(entries []Content, entry Content) bool {
+func contains(entries []models.Content, entry models.Content) bool {
 	for _, e := range entries {
 		if e.ID == entry.ID { // Assuming Content has an ID field
 			return true
