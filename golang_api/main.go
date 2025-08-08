@@ -73,13 +73,16 @@ type Content struct {
 	NormCentroid        string    `json:"norm_centroid"`
 	ReplaygainTrackGain string    `json:"replaygain_track_gain"`
 	ReplaygainTrackPeak string    `json:"replaygain_track_peak"`
-	Offset              string    `json:"liq_on_offset"`
+	Offset              string    `json:"liq_on_offset" gorm:"column:liq_on_offset"`
 	Stream              string    `json:"stream"`
 	Stream_2            string    `json:"stream_2"`
 	MixType             string    `json:"mix_type"`
 	Style               string    `json:"style"`
 	LastPlayed          time.Time `json:"last_played"`
 	SpecFlatnessNorm    string    `json:"spec_flatness_norm"`
+	YamnetEmbeddings    []byte    `json:"yamnet_embedding" grom:"type:blob"`
+	PCA1D               float64   `json:"pca_1d"`
+	IntensityStep       int       `json:"intersity_step"`
 	Duration            string    `json:"duration"`
 	Processed           string    `json:"processed"`
 	Currated            string    `json:"currated"`
@@ -107,12 +110,12 @@ func main() {
 	// Set up the logger
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
-				logger.Config{
-					SlowThreshold:             200 * time.Millisecond, // Slow SQL threshold
-					LogLevel:                  logger.Info,            // Log level
-					IgnoreRecordNotFoundError: true,                   // Ignore ErrRecordNotFound error for logger
-					Colorful:                  true,                   // Disable color
-				},
+		logger.Config{
+			SlowThreshold:             200 * time.Millisecond, // Slow SQL threshold
+			LogLevel:                  logger.Info,            // Log level
+			IgnoreRecordNotFoundError: true,                   // Ignore ErrRecordNotFound error for logger
+			Colorful:                  true,                   // Disable color
+		},
 	)
 
 	var err error
@@ -217,7 +220,7 @@ var recentlyPlayed []Content
 func home(c *gin.Context) {
 	c.HTML(http.StatusOK, "home.tmpl", gin.H{
 		"title":   "millicent",
-	"playout": recentlyPlayed,
+		"playout": recentlyPlayed,
 	})
 }
 
@@ -291,10 +294,10 @@ func admin(c *gin.Context) {
 
 	c.HTML(http.StatusOK, "index.tmpl", gin.H{
 		"title":        "Admin",
-	"data":         contents,
-	"currentPage":  page,
-	"nextPage":     nextPage,
-	"previousPage": prevPage,
+		"data":         contents,
+		"currentPage":  page,
+		"nextPage":     nextPage,
+		"previousPage": prevPage,
 	})
 }
 
@@ -638,11 +641,11 @@ func upload(c *gin.Context) {
 	var content Content
 
 	select {
-		case content = <-contentChan:
-			fmt.Println("\nNew file detatils:")
-			prettyPrintStruct(content)
-		case err = <-errChan:
-			fmt.Printf("Error %s while extracting audio data", err)
+	case content = <-contentChan:
+		fmt.Println("\nNew file detatils:")
+		prettyPrintStruct(content)
+	case err = <-errChan:
+		fmt.Printf("Error %s while extracting audio data", err)
 	}
 
 	db.Create(&content)
@@ -803,7 +806,7 @@ func getContentWhere(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK,
-		       contents)
+		contents)
 }
 
 func isValidQueryParam(param string) bool {
@@ -845,7 +848,7 @@ func getNext(c *gin.Context) {
 	// Only get files shorter than 30 seconds files on the vocal_fx stream
 	if params["stream_2"] == "vocal_fx" {
 		params["stream_2"] = "vocal"
-		params["duration_lt"] = "30"
+		params["duration_lt"] = "20"
 		params["duration_gt"] = ""
 	}
 
@@ -856,41 +859,38 @@ func getNext(c *gin.Context) {
 	for key, value := range params {
 		if valueStr, ok := value.(string); ok && valueStr != "" {
 			switch key {
-				case "norm_centroid", "norm_energy":
-					val, err := strconv.Atoi(valueStr)
-					if err != nil {
-						log.Fatal("norm_x str conversion error")
-					}
+			case "norm_centroid", "norm_energy":
+				val, err := strconv.Atoi(valueStr)
+				if err != nil {
+					log.Fatal("norm_x str conversion error")
+				}
 
-					if val >= 2 && val <= 8 {
-						query = query.Where(key+" >= ?", val-1)
-						query = query.Where(key+" <= ?", val+1)
-					} else if val < 2 {
-						query = query.Where(key+" >= ?", 0)
-						query = query.Where(key+" <= ?", 4)
-					} else if val > 8 {
-						query = query.Where(key+" > ?", 5)
-						query = query.Where(key+" <= ?", 9)
-					}
+				if val >= 2 && val <= 8 {
+					query = query.Where(key+" BETWEEN ? AND ?", val-1, val+1)
+				} else if val < 1 {
+					query = query.Where(key+" BETWEEN ? AND ?", 0, 3)
+				} else if val > 8 {
+					query = query.Where(key+" BETWEEN ? AND ?", 7, 9)
+				}
+// Include current centroid val.
+				// query = query.Where(key+" != ?", val)
 
-					query = query.Where(key+" != ?", val)
-
-				case "duration_lt":
-					val, err := strconv.Atoi(valueStr)
-					if err != nil {
-						c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err})
-					} else {
-						query = query.Where("CAST(duration AS REAL) < ?", val)
-					}
-				case "duration_gt":
-					val, err := strconv.Atoi(valueStr)
-					if err != nil {
-						c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err})
-					} else {
-						query = query.Where("CAST(duration AS REAL) > ?", val)
-					}
-				default:
-					query = query.Where(key+" = ?", value)
+			case "duration_lt":
+				val, err := strconv.Atoi(valueStr)
+				if err != nil {
+					c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err})
+				} else {
+					query = query.Where("CAST(duration AS REAL) < ?", val)
+				}
+			case "duration_gt":
+				val, err := strconv.Atoi(valueStr)
+				if err != nil {
+					c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err})
+				} else {
+					query = query.Where("CAST(duration AS REAL) > ?", val)
+				}
+			default:
+				query = query.Where(key+" = ?", value)
 			}
 		}
 	}
@@ -918,8 +918,11 @@ func getNext(c *gin.Context) {
 	query = query.Where("last_played < ?", pastTime.In(time.Local).Format("2006-01-02T15:04:05.000Z"))
 
 	// Ensure proper grouping of conditions - WHY ?
-	query = query.Where("(`stream_2` = ? AND CAST(duration AS REAL) < ? AND `currated` = ?) OR (`stream_2` = ? AND `last_played` < ?)",
-			    params["stream_2"], params["duration_lt"], "1", params["stream_2"], pastTime.In(time.Local).Format("2006-01-02T15:04:05.000Z"))
+	//query = query.Where(
+	//	db.Where("stream_2 = ? AND CAST(duration AS REAL) < ? AND currated = ?", params["stream_2"], //params["duration_lt"], "1").
+		//Or("stream_2 = ? AND last_played < ?", params["stream_2"], //pastTime.Format("2006-01-02T15:04:05.000Z")),
+	//)
+
 
 	// Apply weighted randomization logic (using a separate library like "github.com/cespare/weightedrand")
 	// fix this
@@ -950,17 +953,6 @@ func getNext(c *gin.Context) {
 		if weight < 1 {
 			weight = 1
 		}
-
-		//if playCount != 0 {
-		//	playCount = int(maxPlaycountInDb / playCount)
-		//} else {
-		//	playCount = maxPlaycountInDb
-		//}
-		//
-		//		// make sure playCount is not 0 or less ?
-		//		if playCount <= 0 {
-		//			playCount = maxPlaycountInDb
-		//		}
 
 		choices = append(choices, randutil.Choice{Item: content, Weight: weight})
 	}
@@ -998,7 +990,7 @@ func getNext(c *gin.Context) {
 	formattedResult := fmt.Sprintf("annotate:id=\"%d\",title=\"%s\",artist=\"%s\",duration=\"%s\",mix_type=\"%s\",source_url=\"%s\",liq_on_offset=\"%s\",play_count=\"%s\",style=\"%s\",stream=\"%s\",norm_energy=\"%s\",norm_centroid=\"%s\",replaygain_track_gain=\"%s\":file:///%s/%s",
 		choice.ID, choice.Title, choice.Artist, choice.Duration, choice.MixType, choice.SourceUrl, choice.Offset, choice.PlayCount, choice.Style, choice.Stream_2, choice.NormEnergy, choice.NormCentroid, choice.ReplaygainTrackGain, base_url, choice.Url)
 
-		c.String(http.StatusOK, formattedResult)
+	c.String(http.StatusOK, formattedResult)
 }
 
 // / postContent take JSON in the body of a request and adds it to the content table in the db
@@ -1029,7 +1021,7 @@ func postContent(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusCreated,
-		       newContent)
+		newContent)
 }
 
 // Function to check if a column exists in the table // not working
