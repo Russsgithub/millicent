@@ -292,7 +292,9 @@ func GetNext(c *gin.Context) {
 	}
 
 	// Build the formatted result string
-	base_url := "home/ubuntu/archive"
+	// Editted for testing purposes
+	base_url := "/run/media/russ/FE7B-F6D2/work/millicent_archive"
+	//base_url := "home/ubuntu/archive"
 	formattedResult := fmt.Sprintf("annotate:id=\"%d\",title=\"%s\",artist=\"%s\",duration=\"%s\",mix_type=\"%s\",source_url=\"%s\",liq_on_offset=\"%s\",play_count=\"%s\",style=\"%s\",stream=\"%s\",norm_energy=\"%s\",norm_centroid=\"%s\",replaygain_track_gain=\"%s\":file:///%s/%s",
 		choice.ID, choice.Title, choice.Artist, choice.Duration, choice.MixType, choice.SourceUrl, choice.Offset, choice.PlayCount, choice.Style, choice.Stream_2, choice.NormEnergy, choice.NormCentroid, choice.ReplaygainTrackGain, base_url, choice.Url)
 
