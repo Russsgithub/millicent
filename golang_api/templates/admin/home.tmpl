@@ -4,6 +4,7 @@
   <title>millicent</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs" defer></script>
   <style>
     body {
         font-family: Arial, sans-serif;
@@ -11,7 +12,7 @@
         padding: 0;
         background-color: #e5e4db;
       }
-      
+
       .background-container {
         position: absolute;
         left: 0;
@@ -37,11 +38,12 @@
         display: flex;
         align-items: end;
       }
-      
+
       h1 {
         text-align: center;
         margin-bottom: 20px;
       }
+
       .title {
       	text-align: left;
       	margin-bottom: 20px;
@@ -49,7 +51,7 @@
       	left: 0;
       	margin: 50px;
       }
-      
+
       .cover_art {
         height:50vh;
         background-position: center;
@@ -64,7 +66,7 @@
         padding: 0 150px;
         margin-top: 2rem;
       }
-      
+
       .metadata-box {
         background-color: #2626261a;
         padding: 20px;
@@ -85,14 +87,14 @@
         text-align: left;
         padding-left: 5px;
       }
-      
+
       .audio-wrapper {
         position: relative;
         padding: 20px;
         border-radius: 5px;
         z-index: -2;
       }
-      
+
       #audio-player {
         width: 100%;
         display: none;
@@ -126,8 +128,8 @@
       .hidden {
           opacity: 0;
           transition: opacity 1.5s ease;
-      }    
-      
+      }
+
       .heading {
         width: 50vw;
       }
@@ -154,7 +156,7 @@
         font-size: 2rem;
         margin: 0.5rem 2rem;
       }
-      
+
       .no-image {
         height: 40px;
       }
@@ -165,11 +167,10 @@
         right: 0;
         display: flex;
         flex-direction: column;
-        border-left: 2px solid black;
-        border-top: 2px solid black;
-        border-bottom: 2px solid  black;
-        border-radius: 4px;
-        padding-right: 20px;
+        border: 1px solid black;
+        border-radius: 1.5rem;
+        padding-right: 1rem;
+        margin-right: 1rem;
         max-width: 250px;
         max-height: 60vh;
         overflow: scroll;
@@ -179,6 +180,7 @@
         display: flex;
         flex-direction: row;
         list-style-type: none;
+        border-bottom: 1px block solid;
         padding-bottom: 10px;
         text-decoration: none;
         color: rgb(41, 41, 41);
@@ -217,7 +219,7 @@
         padding: 0 1rem;
         background: #e5e4db;
       }
-  
+
       .statement {
         margin: 2rem 0;
         padding-left: 1rem;
@@ -226,7 +228,7 @@
         transform: translateY(20px);
         animation: fadeInUp 0.8s forwards;
       }
-  
+
       /* Add staggered animation delays */
       .statement:nth-child(1) { animation-delay: 0.2s; }
       .statement:nth-child(2) { animation-delay: 0.4s; }
@@ -237,11 +239,11 @@
       .statement:nth-child(7) { animation-delay: 1.6s; }
       .statement:nth-child(8) { animation-delay: 1.8s; }
       .statement:nth-child(9) { animation-delay: 2s; }
-  
+
       .statement:hover {
         color: #555;
       }
-  
+
       @keyframes fadeInUp {
         to {
           opacity: 1;
@@ -249,17 +251,6 @@
         }
       }
 
-      #waveform {
-          display: none;
-          position: absolute;
-          top: 50%; /* Center vertically */
-          left: 0;
-          transform: translateY(-50%); /* Adjust for vertical centering */
-          pointer-events: none; /* Allow clicks to pass through */
-          z-index: -9999; /* Push to the bottom layer */
-          filter: blur(1px)
-      }
-      
       /* Responsive Styles */
       @media screen and (max-width: 600px) {
         body {
@@ -271,11 +262,11 @@
           padding: 0;
           margin-top: 0.5rem;
         }
-      
+
         .metadata-box {
           margin-bottom: 10px;
         }
-      
+
         .audio-wrapper {
           padding: 10px;
         }
@@ -324,7 +315,6 @@
   </style>
 </head>
 <body>
-  <canvas id="waveform"></canvas>
   <div class="container">
     <div class="heading_container" style="background-color: ##5f6459">
       <img class="heading" src="https://millicent.org/static/imgs/millicent_heading.png" />
@@ -358,7 +348,7 @@
       <div class="metadata-box hidden no-image" id="metadata-box-3">-</div>
     </div>
     <div id="manifesto" class="manifesto hide">
-      <h2 class="manifesto-header" style="margin-bottom: 0">'millicent' Manifesto</h2> 
+      <h2 class="manifesto-header" style="margin-bottom: 0">'millicent' Manifesto</h2>
       <section class="statement-list">
         <p class="statement">1) To view the existence of the internet as a positive opportunity towards the uniting of humanity.</p>
         <p class="statement">2) To work towards the unity of humanity through the promotion of music, storytelling, poetry and sound design, from all languages and cultures.</p>
@@ -379,8 +369,6 @@
   <script>
     const audio = document.getElementById("audio-player");
     const playButton = document.getElementById("play-button");
-    const canvas = document.getElementById('waveform');
-    const canvasCtx = canvas.getContext('2d');
 
     function view_manifesto() {
       const manifesto = document.getElementById('manifesto');
@@ -412,13 +400,13 @@
       a.className = 'playout_item';
       a.href = (item.source_url != "") ? item.source_url : 'https://duckduckgo.com/?t=ffab&q=${item.title}%20${artist}&ia=web';
       a.target = "_blank";
-      
+
       const img = document.createElement('img');
       img.src = item.image;
       img.width = 30;
       img.height = 30;
       img.onerror = function() {
-          this.onerror = null; 
+          this.onerror = null;
           this.src = 'https://millicent.org/static/covers/default_cover.png';
       };
 
@@ -452,7 +440,7 @@
         playoutList.removeChild(playoutList.lastElementChild);
       }
     }
-    
+
     document.addEventListener("DOMContentLoaded", function () {
       // Initialize hls.js
       if (Hls.isSupported()) {
@@ -460,20 +448,20 @@
         const metadataBoxes = document.getElementsByClassName("metadata-box");
         const metadataAndPTS = []; // Array to store received metadata and associated PTS
         let currentPTS = 0; // Store the current PTS from the stream
-  
+
         // Load the HLS stream source
         hls.loadSource("https://d1i4sik9cp7a6c.cloudfront.net/hls/live.m3u8");
         hls.attachMedia(audio);
-  
+
         // Event listener for "FRAG_PARSING_METADATA" in HLS.js
         hls.on(Hls.Events.FRAG_PARSING_METADATA, function (event, data) {
           const metadataText = new TextDecoder("utf-8").decode(data.samples[0].data);
 
           console.log("Event: " + metadataText.substring(21));
-        
+
           // Extract JSON data (assuming a fixed 21-character header)
           const jsonStr = metadataText.substring(21);
-        
+
           try {
             const parsedData = JSON.parse(jsonStr);
 
@@ -485,26 +473,26 @@
             console.log(jsonStr);
           }
         });
-        
+
         // Event listener for "timeupdate" on the audio player
         audio.addEventListener("timeupdate", function () {
           const playerTimestamp = audio.currentTime;
-        
+
           while (metadataAndPTS.length > 0 && metadataAndPTS[0].pts <= playerTimestamp) {
             const { pts, metadata } = metadataAndPTS.shift();
             updateMetadataBoxes(metadata);
           }
         });
-  
+
         // Helper function to update the text boxes with metadata
         function updateMetadataBoxes(metadata) {
           console.log("updating metadata");
           // Define an array of keys to extract from the metadata
           const keys = ["music", "field", "vocal"];
           let td_metadata_arr = [];
-          
+
           console.log("metadata at update: "+ metadata)
- 
+
           // Loop through the keys and update the corresponding metadata boxes
           keys.forEach((key, index) => {
             console.log("Inloop")
@@ -514,10 +502,10 @@
             const source_url = metadataValue.source_url || '';
             const image = metadataValue.image || '';
             console.log(source_url);
-            
+
             const box = metadataBoxes[index];
 
-            
+
             // Update the text content of the box
             if (title !== 'silence' && artist !== 'silence') {
               box.innerHTML = `
@@ -537,7 +525,7 @@
           });
           td_metadata_string = td_metadata_arr.join(",") + ",";
 
-          
+
           console.log(`{"message": ${td_metadata_string}`);
           const res = fetch("http://localhost:9980", {
             method: "POST",
@@ -550,165 +538,7 @@
         }
       } else {
         console.error("HLS.js is not supported in this browser.");
-      }
-
-        // Set up canvas size
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        // Set up audio visualization
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const analyser = audioCtx.createAnalyser();
-        const source = audioCtx.createMediaElementSource(audio);
-        
-        source.connect(analyser);
-        analyser.connect(audioCtx.destination);
-        
-        analyser.fftSize = 256;
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        // Circle class to manage individual circles
-        class Circle {
-            constructor(x, y, radius, color, index) {
-                this.x = x;
-                this.y = y;
-                this.radius = radius;
-                this.color = color;
-                this.index = index;
-                this.velocityX = (Math.random() - 0.5) * 0.5; // Slow horizontal movement
-                this.velocityY = (Math.random() - 0.5) * 0.5; // Slow vertical movement
-                this.opacity = 0.5; // Initial opacity
-            }
-        
-            draw() {
-                canvasCtx.beginPath();
-                canvasCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        
-                // Adjust color opacity dynamically based on overall volume
-                const dynamicColor = this.color.replace('0.5', this.opacity.toFixed(2)); // Replace static opacity
-                canvasCtx.fillStyle = dynamicColor;
-                canvasCtx.fill();
-                canvasCtx.closePath();
-            }
-        
-            update(volume) {
-                // Use audio data to update radius dynamically
-                this.radius = Math.max(dataArray[this.index] / 10, 1); // Smooth reactivity
-        
-                // Update opacity based on overall volume
-                this.opacity = Math.max(volume / 256, 0.2); // Minimum opacity of 0.2
-        
-                this.x += this.velocityX;
-                this.y += this.velocityY;
-        
-                // Keep circles within canvas bounds
-                if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
-                    this.velocityX = -this.velocityX;
-                }
-                if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
-                    this.velocityY = -this.velocityY;
-                }
-        
-                this.draw();
-            }
-        }
-        
-        const circles = [];
-        
-        // Initialize circles with corresponding indices for audio reactivity
-        for (let i = 0; i < bufferLength; i++) {
-            const x = Math.random() * canvas.width;
-            const y = Math.random() * canvas.height;
-            let color;
-        
-            // Assign colors based on frequency ranges
-            if (i < bufferLength / 3) {
-                color = `rgba(149, 81, 153, 0.5)`; // Blue tones
-            } else if (i < (2 * bufferLength) / 3) {
-                color = `rgba(223, 224, 221, 0.5)`; // Purple tones
-            } else {
-                color = `rgba(243, 241, 6, 0.5)`; // Pink tones
-            }
-        
-            circles.push(new Circle(x, y, 10, color, i));
-        }
-        
-        
-        function updateBlueCircles() {
-            circles.forEach((circle, i) => {
-                if (circle.color.includes('149, 81, 153')) { // Blue circles
-                    circles.forEach((otherCircle, j) => {
-                        if (i !== j && otherCircle.color.includes('149, 81, 153')) {
-                            const dx = circle.x - otherCircle.x;
-                            const dy = circle.y - otherCircle.y;
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-        
-                            if (distance < 50) { // Repulsion threshold
-                                const force = (50 - distance) / 50; // Strength decreases with distance
-                                const angle = Math.atan2(dy, dx);
-                                circle.x += Math.cos(angle) * force;
-                                circle.y += Math.sin(angle) * force;
-                            }
-                        }
-                    });
-                }
-            });
-        }
-        
-        function drawYellowLines() {
-            circles.forEach((circle, i) => {
-                if (circle.color.includes('223,224,221')) { // Yellow circles
-                    circles.forEach((otherCircle, j) => {
-                        if (i !== j && otherCircle.color.includes('223,224,221')) {
-                            const dx = circle.x - otherCircle.x;
-                            const dy = circle.y - otherCircle.y;
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-        
-                            if (distance < 100) { // Connection threshold
-                                const opacity = Math.max(1 - distance / 100, 0.1) * (dataArray[circle.index] / 256); // Adjust opacity
-                                canvasCtx.beginPath();
-                                canvasCtx.moveTo(circle.x, circle.y);
-                                canvasCtx.lineTo(otherCircle.x, otherCircle.y);
-                                canvasCtx.strokeStyle = `rgba(223,224,221, ${opacity.toFixed(2)})`;
-                                canvasCtx.lineWidth = 2;
-                                canvasCtx.stroke();
-                                canvasCtx.closePath();
-                            }
-                        }
-                    });
-                }
-            });
-        }
-        
-        // Update the drawCircles function
-        function drawCircles() {
-            requestAnimationFrame(drawCircles);
-        
-            analyser.getByteFrequencyData(dataArray);
-        
-            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-        
-            const volume = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-        
-            // Update blue circles with fluid-like interaction
-            updateBlueCircles();
-        
-            // Update and draw all circles
-            circles.forEach(circle => circle.update(volume));
-        
-            // Draw connections for yellow circles
-            drawYellowLines();
-        }
-        
-        audio.addEventListener('play', () => {
-            audioCtx.resume(); // Ensure audio context is running
-            drawCircles();
-        });
-
-
-
-      
+      };
     });
     function playNow() {
       if (audio.paused) {
