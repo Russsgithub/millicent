@@ -1,0 +1,832 @@
+settings.init.allow_root.set(true)
+settings.frame.audio.samplerate := 48000
+settings.scheduler.fast_queues := 6
+settings.scheduler.generic_queues := 6
+settings.scheduler.non_blocking_queues := 6
+
+#settings.scheduler.queues := [("generic", 6), ("non_blocking", 6), ("autocue", 6)]
+
+#settings.autocue.internal.queues_count := 6
+
+settings.charset.max_string_length := 2056
+
+settings.log.level := 3
+
+## for use with liq 2.2.5 +
+settings.autocue.amplify_behavior := "override"
+settings.autocue.internal.max_overlap := 14.0
+settings.autocue.internal.cross_threshold := -6.0
+settings.autocue.internal.sustained_endings_enabled := true
+settings.autocue.internal.cue_out_threshold := -90.0
+settings.autocue.internal.cue_in_threshold := -90.0
+
+# Autocue causing issues with processing lock up , try s3 on switch
+# prefetch 1 and or use protocol in api response which only cals autocue on music stream.
+enable_autocue_metadata()
+#enable_replaygain_metadata()
+
+interactive.harbor()
+
+s1bpm = ref(1.0)
+s2bpm = ref(1.0)
+
+s1type = ref(false)
+s2type = ref(false)
+s3type = ref(false)
+s4type = ref(false)
+
+s2_verb = ref(false)
+
+words = ref(false)
+
+loud = ref("8")
+notPlayAlone = ref(true)
+spec_band_norm = ref("6")
+ambient_only = ref(false)
+
+music_centroid = ref("800.0")
+
+now_playing = json()
+
+def init_metadata_json ()
+    now_playing.add("music", {title = "silence", artist = "silence", source_url = "silence", image = null})
+    now_playing.add("field", {title = "silence", artist = "silence", source_url = "silence"})
+    now_playing.add("vocal", {title = "silence", artist = "silence", source_url = "silence"})
+end
+
+init_metadata_json()
+
+now_playing_metadata_queue = ref([])
+
+def update_now_playing_metadata()
+  now_playing_metadata_queue := list.append(now_playing_metadata_queue(), [(time(), now_playing)])
+end
+
+update_now_playing_metadata()
+
+def get_now_playing_metadata()
+  list.hd(default=null, now_playing_metadata_queue())
+end
+
+## tupples not lists
+
+metadata_delay = interactive.float(min=0., max=90., description="delay in s for meta end point", "meta delay", 90.)
+
+def get_delayed_now_playing_metadata()
+  print("metadata length: #{list.length(now_playing_metadata_queue())}")
+  m = list.filter(fun(x) -> time() - fst(x) >= metadata_delay() , now_playing_metadata_queue())
+  print(now_playing_metadata_queue())
+  print("m length: #{list.length(m)}")
+  if list.length(m) > 1 then
+    m = list.last(m)
+    now_playing_metadata_queue := list.tl(now_playing_metadata_queue())
+  end
+  snd(list.hd(default=null, m))
+end
+
+def update_metadata(key, value)
+  now_playing.add(key, value)
+  update_now_playing_metadata()
+end
+
+music_now_url = ref("")
+field_now_url = ref("")
+vocal_now_url = ref("")
+
+music_push_q_length = ref(0)
+field_push_q_length = ref(0)
+
+music_offset_trigger = ref(0.0)
+
+music_playlog = playlog(duration=3600., persistency="./music_playlog", hash=fun (m) -> file.digest(metadata.filename(m)))
+field_playlog = playlog(duration=3600., persistency="./field_playlog", hash=fun (m) -> file.digest(metadata.filename(m)))
+vocal_playlog = playlog(duration=3600., persistency="./vocal_playlog", hash=fun (m) -> file.digest(metadata.filename(m)))
+v_fx_playlog = playlog(duration=3600., persistency="./vfx_playlog", hash=fun (m) -> file.digest(metadata.filename(m)))
+
+last_music_mix_type = ref("")
+
+last_radio_metadata = ref([])
+
+play_vox_now = ref(false)
+
+#### vocal trigger flags
+v_fx_play = ref(false)
+def play_v_fx()
+  log("allowing effected vocal to play")
+  v_fx_play := true
+end
+thread.when({25m or 55m},play_v_fx)
+
+vox_play = ref(false)
+def play_vox()
+  log("allowing vocal to play")
+  vox_play := true
+#  ambient_only := true
+end
+thread.when({15m},play_vox)
+#thread.when({55m or 05m or 15m or 25m or 35m or 45m},play_vox)
+
+is_night = ref(false)
+
+def is_night_calc()
+    if time.local().hour > 19 or time.local().hour < 7 then
+        is_night := true
+    else
+        is_night := false
+    end
+end
+
+thread.when({0m}, is_night_calc)
+
+is_night_calc()
+
+dusk_dawn = ref(false)
+
+def is_dusk_dawn_calc()
+    if time.local().hour == 20 or time.local().hour == 7 then
+        dusk_dawn := true
+    else
+        dusk_dawn := false
+    end
+end
+
+thread.when({0m}, is_dusk_dawn_calc)
+
+auth = ref(string.base64.encode("control:m1ll1c3nt"))
+
+attempt_count_music = ref(0)
+
+play_alone_consecutive_count = ref(0)
+
+a_o = interactive.bool(description="ao", "Ambient only", false)
+
+#thread.run(every=5.0, fun() -> print("#{a_o()}"))
+#next_track_decision_key = interactive.string(description="Metadata key to calculate next track from. (norm_centroid or norm_energy)", "next track decision key", "norm_centroid")
+next_track_decision_key = ref("norm_centroid") # norm_centroid or norm_energy
+
+# Alternate next track decision mechanism just before the hour, tweek.
+def switch_decision_key()
+  if next_track_decision_key() == "norm_energy" then
+    next_track_decision_key := "norm_centroid"
+  else
+    next_track_decision_key := "norm_energy"
+  end
+end
+
+# Using 3 20m time gaps alternates over hours (for variation)
+thread.when({08m or 28m or 48m}, switch_decision_key)
+
+
+def next_track(stream)
+  base_url = "https://millicent.org/next"
+# base_url = "http://localhost:8080/next"
+  next_track_url = ref("#{base_url}?stream=#{stream}")
+
+  if stream == "music" then
+    nPA = if notPlayAlone() or play_alone_consecutive_count() > 1 then "Mix" else "" end
+      ## remove this for test / ambient as loud value not tagged in the db
+    ## ao = if ambient_only() or dusk_dawn() or a_o() then "ambient" else "" end
+
+    def ambient_loud()
+      if next_track_decision_key() == "norm_centroid" then
+        "8"
+      else
+        "1"
+      end
+    end
+
+    loud := if ambient_only() or dusk_dawn() or a_o() then ambient_loud() else loud() end
+    next_track_url := "#{next_track_url()}&#{next_track_decision_key()}=#{loud()}&mix_type=#{nPA}" # removed for the above experiment &genre=#{ao}"
+  end
+
+  result = http.get(headers=[("Authorization", "Basic " ^ auth() )], next_track_url())
+
+  if string.contains(substring="zero Choices with Weight", result) and attempt_count_music() == 0 then
+    attempt_count_music := attempt_count_music() + 1
+    ambient_only := false
+    dusk_dawn := false
+  end
+
+#  result = if stream != "music" then "annotate:liq_disable_autocue=true:"^result else result end
+
+  request.create("annotate:liq_blankskip=0.00:"^result)
+end
+
+
+s1_q = request.dynamic(id="music_alone", prefetch=3, {next_track("music")})
+#s1_q = request.dynamic(id="music_q", prefetch=0, nextm_b)
+
+s2_q = request.dynamic(id="field", prefetch=0, retry_delay=10., {next_track("noise")})
+
+s3_q = request.dynamic(id="vocal", prefetch=1, retry_delay=10., {next_track("vocal")})
+
+s4_q = request.dynamic(id="vocal_fx", prefetch=0, retry_delay=10.0, {next_track("vocal_fx")})
+
+#s1 = fallback([s1_q, s1])
+s2_fallback = s2_q
+
+s1 = amplify(id="alone_amp", override="liq_amplify", 1.0, s1_q)
+s2 = amplify(id="field_amp", override="liq_amplify", 0.22, s2_fallback)
+s3 = amplify(id="vox_amp", override="liq_amplify", 1.2, s3_q)
+s4 = amplify(id="vox_fx_amp", override="liq_amplify", 0.4, s4_q)
+
+last_music_key = ref("")
+
+## Trigger stream on startup  for debugging
+#thread.run(fun() -> s3_q.set_queue(nextv()))
+## map metadata
+###
+###
+## set default value
+def default(default_val, val) =
+  if val == "" then default_val else val end
+end
+
+def map(m)
+  print(m)
+  type = m['stream']
+  title = m['title']
+  artist = m['artist']
+  source_url = m['source_url']
+  space = if artist != "" then " " else "" end
+  source_url_fallback = "https://duckduckgo.com/?q="^artist^space^title
+
+  ### next track decision key variable, set above map function.
+  loudness = default("5", m[next_track_decision_key()])
+  # spec_band_norm_val = default("5", m['spec_bandwidth_norm'])
+  log("playing - #{title} on #{type}")
+
+  def increase_music_loud_val()
+    loud := string(int_of_string(loud()) + 1)
+    log("loud equals #{loud()}")
+  end
+
+  if type == "music" then
+    attempt_count_music := 0
+    if music_playlog.last(m) < 3600. then
+      if s3type() then
+          log("vocal")
+      else
+          log("repeat")
+      end
+      log("skipping music - either vocal is playing and music choice is not Amb or a repeat has been stopped")
+#      thread.run(increase_music_loud_val)
+      s1_q.skip()
+      s1type := false
+      words := false
+      []
+    elsif m['mix_type'] == "Play alone" then
+      if s3type() then
+        log("skipping music - vocals are playing and play alone has been selected")
+        s1_q.skip()
+        s1type := false
+        words := false
+        []
+      else
+        log("Words set to true")
+        offset = m['liq_on_offset']
+        music_offset_trigger := if offset != "" then
+            float_of_string(offset)
+        else
+            0.0
+        end
+        log("offset: #{music_offset_trigger()}")
+        s_url = if source_url == "" then source_url_fallback else source_url end
+        music_now_url := "#{s_url}"
+        words := true
+        s1type := true
+        loud := loudness
+        play_alone_consecutive_count := play_alone_consecutive_count() + 1
+#        spec_band_norm := spec_band_norm_val
+#        notPlayAlone := true
+#        music_centroid := default("800.0", m["dominant_frequency"])
+        #music_now_playing := "#{title} by #{artist}"
+#        last_music_key := m['key']
+        m
+      end
+    else
+      log("Words set to false")
+      offset = m['liq_on_offset']
+      music_offset_trigger := if offset != "" then
+          float_of_string(offset)
+      else
+          0.0
+      end
+      log("offset: #{music_offset_trigger()}")
+      s_url = if source_url == "" then source_url_fallback else source_url end
+      music_now_url := "#{s_url}"
+      words := false
+      s1type := true
+      notPlayAlone := false
+      loud := loudness
+      play_alone_consecutive_count := 0
+#      spec_band_norm := spec_band_norm_val
+#      music_centroid := default("800.0", m["dominant_frequency"])
+      #music_now_playing := "#{title} by #{artist}"
+#      last_music_key := m['key']
+      m
+    end
+  elsif type == "noise" then
+    print("Preparing field recording")
+    if int_of_string(loudness) > 5 then
+      s2_verb := true
+    else
+      s2_verb := false
+    end
+
+    if words() or (field_playlog.last(m) < 3600.) then
+      log("skipping field rec - play alone playing or repeat")
+      s2type := false
+      []
+    else
+      s_url = if source_url == "" then source_url_fallback else source_url end
+      field_now_url := "#{s_url}"
+      #field_recording_now_playing := "#{title} by #{artist}"
+      s2type := true
+      m
+    end
+  elsif type == "vocal" then
+    if words() then
+      log("skipping vocal - words on music")
+#      s3_q.set_queue([])
+      play_vox_now := false
+      s3_q.skip()
+      s3type := false
+      ambient_only := false
+      notPlayAlone := false
+      []
+    else
+      s_url = if source_url == "" then source_url_fallback else source_url end
+      vocal_now_url := "#{s_url}"
+      #vocal_now_playing := "#{title} by #{artist}"
+      #loud := "-1"
+#      s3type := true
+      ambient_only := true
+      play_vox_now := false
+      m
+    end
+  elsif type == "vocal_fx" then
+    if words() or s3type() then
+      log("skipping v fx")
+ #     s4_q.set_queue([])
+      s4_q.skip()
+      s4type := false
+      []
+    else
+      s4type := true
+      m
+    end
+  else
+    log("Something not expected has happened in Map metdata")
+    m
+  end
+end
+
+s1 = metadata.map(update = false, strip = true, map, s1)
+s2 = metadata.map(update = false, strip = true, map, s2)
+s3 = metadata.map(update = false, strip = true, map, s3)
+s4 = metadata.map(update = false, strip = true, map, s4)
+
+s3 = prepend(s3, fun(_) -> blank(duration=4.))
+
+fx_timing_spb = ref(2.5)
+
+## get beat from s1
+def s1_bpm_call(ct) =
+    s1bpm := ct
+end
+
+s1 = bpm(s1)
+s2 = bpm(s2)
+#p = bpm(poems)
+
+##if s1 bpm is close to s2 bpm match it
+def s2_bpm_set(ct) =
+  f = 1. / (s1.bpm() / ct)
+
+  if 0.2 <= f and f < 0.3 then
+    s2bpm := f * 4.
+  elsif 0.275 <= f and f < 0.4 then
+    s2bpm := f * 3.
+  elsif 0.40 < f and f < 0.60 then
+    s2bpm := f  * 2.
+  elsif 0.8 <= f and f <= 1.2 then
+    s2bpm := f
+  elsif 1.8 <= f and f <= 2.2 then
+    s2bpm := f / 2.
+  else
+    s2bpm := 1.0
+  end
+# move s2bpm setter here
+end
+
+thread.run(every=1.0,{if s1.bpm() != 0. then fx_timing_spb := (60. / s1.bpm() * 24.) end})
+#thread.run(fast=true, every=2.0,{s2_bpm_set(((s2.bpm())))})
+# changed s2 to s3 above and s3 bpm above that
+
+vocal_queued = ref(false)
+
+def event_trigger(t,m)
+  log("Event triggered")
+#  log("vox play - #{vox_play()}, v_fx_play - #{v_fx_play()}, recs playing - #{s2type()} - vox play - #{s3type()}, words - #{words()}")
+  if list.is_empty(s2_q.queue()) then
+    log("Adding field recoding to queue")
+    def p_s2()
+      ignore(s2_q.add(next_track("noise")))
+      ()
+    end
+    thread.run(delay=fx_timing_spb(), p_s2)
+    true
+  else
+    log("NOT adding to filed queue")
+    false
+  end
+
+  def all_off()
+    log("ALL off!")
+    vox_play := false
+    v_fx_play := false
+    vocal_queued := false
+  end
+
+  def v_fx_push()
+    stream = ref("vocal_fx")
+
+    def track_push()
+      log("Queuing #{stream()}.")
+      all_off()
+      if stream() == "vocal" then
+        ignore(s3_q.add(next_track("vocal")))
+      else
+        ignore(s4_q.add(next_track("vocal_fx")))
+      end
+      ()
+    end
+
+    if vox_play() then
+      print("Can play vocals, attempting")
+      vocal_queued := true
+      notPlayAlone := true
+      #ambient_only := true
+      loud := ""
+      vox_play := false
+      stream := "vocal"
+
+      delay_time = source.remaining(s1) + fx_timing_spb()
+      log("Pushing vocal in #{delay_time} seconds")
+      thread.run(delay=delay_time, fun() -> play_vox_now := true)
+      # Remove last item in music queue
+      #music_queue = s1_q.queue()
+      #extra_music_request = list.last(default=null(), music_queue)
+      #request.destroy(extra_music_request)
+      ##
+      #request.destroy(list.last(s1_q.queue()))
+      #s1_q.set_queue([])
+      #delay = source.remaining(s1)
+    elsif not words() and v_fx_play() then
+      v_fx_play := false
+      stream := "vocal_fx"
+      delay_time = fx_timing_spb() * 2.
+      log("Pushing vocal_fx in #{delay_time} seconds")
+      thread.run(delay=delay_time, track_push)
+    else
+      notPlayAlone := false
+      ambient_only := false
+      all_off()
+    end
+  end
+
+  if not words() and not s3type() then
+      log("Getting ready to run cmd push.")
+      thread.run(v_fx_push)
+  else
+      log("play alone music playing, skipping vocals this time round.")
+      thread.run(all_off)
+  end
+end
+
+s1.on_position(position = music_offset_trigger(), synchronous=true, event_trigger)
+
+def save_cover(m)
+  print("Trying to Extract Cover")
+  cvr = metadata.cover(m)
+  t = m['id']
+  fn = "/home/russ/Documents/GitHub/millicent/golang_api/static/covers/#{t}.jpeg"
+
+  cover_url = if cvr != "" and (m['coverart'] != "" or m['pic'] != "" or m['apic'] != "") then
+    if not file.exists(fn) then
+      log("Writting file #{fn}")
+      ignore (file.write(data=cvr, fn))
+    end
+    "https://millicent.org/static/covers/#{t}.jpeg"
+  else
+    log("No cover art found in metadata")
+    log("Using default image for cover art")
+    "https://millicent.org/static/covers/default_cover.png"
+  end
+
+  cover_url
+end
+
+def update_db(m)
+    ID = m["id"]
+    playcount = if m['play_count'] != "" then string(int_of_string(m['play_count']) + 1) else "1" end
+    data = json()
+    data.add("last_played", time.string("%Y-%m-%dT%H:%M:%S.000Z"))
+    data.add("play_count", playcount)
+
+    dt = json.stringify(data)
+    if ID != "" then
+      ignore(http.put(headers=[("Authorization", "Basic " ^ auth() ),("Content-Type","application/json")],data=dt,"https://millicent.org/content/#{ID}"))
+    else
+      print("No id present in metadata for: #{m['title']}")
+      print(m)
+    end
+end
+
+def set_meta_mus(m)
+    if m['stream'] == "music" then
+      cover_url = save_cover(m)
+
+      #now_playing.add("music", {title = "#{m['title']}", artist = "#{m['artist']}", source_url = "#{music_now_url()}", image = cover_url })
+      key = "music"
+      value = {title = "#{m['title']}", artist = "#{m['artist']}", source_url = "#{music_now_url()}", image = cover_url }
+      update_metadata(key, value)
+    end
+    ## add track to json metadata
+    if m['mix_type'] == "Play alone" then
+        log("Music tagged as play alone, skipping s2 track playing")
+        s2_q.set_queue([])
+        s2_q.skip()
+    end
+end
+
+s1.on_metadata(synchronous=false, set_meta_mus)
+s1.on_track(synchronous=false, update_db)
+
+def default_dom_freq(default_val, val) =
+  if val == "" then default_val else val end
+end
+
+s1 = crossfade(s1)
+
+s1 = source.drop.metadata(s1)
+
+##field recordings
+
+s2_notch_eq_freq = interactive.float("field_notch_eq(hz)", description="Field notch freq", min=0., max=5000.0, 3000.0)
+s2_notch_eq_q = interactive.float("field_notch_eq_q", description="Field notch freq q", min=0.1, max=5.0, 3.)
+s2_notch_eq_gain = interactive.float("field_notch_eq_gain", description="Field notch freq gain", min=-12., max=12.0, 2.0)
+
+s2_lim_pre_gain = interactive.float("field limiter pre-gain (lin)", description="Field limiter pre-gain", min=-0., max=2., 1.0)
+
+s2 = amplify(s2_lim_pre_gain, override="none", s2)
+
+s2 = filter.iir.eq.peak(frequency=s2_notch_eq_freq, q=s2_notch_eq_q, gain=s2_notch_eq_gain, s2)
+
+
+s2 = ladspa.sc4(attack_time=1.0, release_time=1000.0, knee_radius=1.0, ratio=2.0, makeup_gain=1.0, threshold_level=-6., s2)
+
+s2 = ladspa.bs2b(s2)
+
+def update_field_metadata(m)
+  #now_playing.add("field", {title = "#{m['title']}", artist = "#{m['artist']}", source_url = "#{field_now_url()}"})
+
+  key = "field"
+  value = {title = "#{m['title']}", artist = "#{m['artist']}", source_url = "#{field_now_url()}", }
+  update_metadata(key, value)
+end
+
+s2.on_track(synchronous=false, update_field_metadata)
+# beat sync field recs to music
+#s2 = soundtouch(tempo = {s2bpm()}, s2)
+
+s2.on_track(synchronous=false, update_db)
+
+def map_blank(m)
+    [
+    ("title", "silence"),
+    ("artist", "silence")
+    ]
+end
+
+silence_f = blank()
+silence_f = metadata.map(update = false, strip = true, map_blank, silence_f)
+
+def skip_s2()
+  if silence_f.is_ready() then
+    if words() then
+      log("Skiping field recording")
+      s2_q.set_queue([])
+      s2_q.skip()
+    end
+  end
+end
+
+
+def s2_transition(a,b)
+  dur =  fx_timing_spb()
+  dur = if dur < 5.0 then
+    dur * 4.
+  elsif dur < 10. then
+    dur * 2.
+  elsif dur > 20. then
+    dur / 2.
+  else
+    dur
+  end
+
+  if b.metadata['title'] == "silence" or list.is_empty(b.metadata) then
+    now_playing.add("field", {title = "silence", artist = "silence", source_url = ""})
+    key = "field"
+    value = {title = "silence", artist = "silence", source_url = ""}
+    update_metadata(key, value)
+    s2type := false
+  else
+    #now_playing.add("field", {title = "#{b.metadata['title']}", artist = "#{b.metadata['artist']}", source_url = "#{field_now_url()}"})
+    key = "field"
+    value = {title = "#{b.metadata['title']}", artist = "#{b.metadata['artist']}", source_url = "#{field_now_url()}"}
+    update_metadata(key, value)
+  end
+  add(normalize=false, [fade.out(duration = dur, a.source), fade.in(duration= dur, b.source)])
+end
+
+s2 = switch(track_sensitive=false, [({words()},silence_f),({true}, s2)])
+
+s2 = cross(duration=20., s2_transition, s2)
+
+##vocal
+s3 = switch(track_sensitive=true, [({play_vox_now()}, s3)])
+
+s3 = ladspa.sc4(attack_time=24., release_time=450., knee_radius=1.0, ratio=4., makeup_gain=0.0, threshold_level=-6., s3)
+
+s3.on_metadata(synchronous=false, fun(m) -> now_playing.add("vocal", {title = "#{m['title']}", artist = "#{m['artist']}", source_url = "#{vocal_now_url()}"}))
+
+s3.on_track(synchronous=false, update_db)
+
+
+##vocal fx
+def vocal_fx_end(t, m)
+  s4type := false
+  log("Vocal fx ending - s4type is #{s4type()}")
+end
+# low was 263.74
+s4 = append(s4,merge=true, fun(_)->blank(duration=10.0))
+s4 = filter.iir.eq.low_high(low={132.15}, high={8373.1}, s4)
+s4 = ladspa.tapedelay(dry_level = {-18.0},tap_1_distance = {fx_timing_spb()},tap_1_level = {-12.0} , tap_2_distance = {fx_timing_spb() * 2.}, tap_2_level = {-19.0}, tap_3_distance = {fx_timing_spb() * 4.}, tap_3_level = {-16.0}, tap_4_distance = {fx_timing_spb() * 8.}, tap_4_level = {-6.0}, tape_speed={1.0}, s4)
+
+s4.on_position(synchronous=false, remaining=true, position=0.0, vocal_fx_end)
+
+#-------------
+# Mixes two streams, with faded transitions between the state when only the
+# normal stream is available and when the special stream gets added on top of
+# it.
+# @category Source / Fade
+# @flag extra
+# @param ~duration Duration of the fade in seconds.
+# @param ~p       Portion of amplitude of the normal source in the mix.
+# @param ~normal  The normal source, which could be called the carrier too.
+# @param ~special The special source.
+def smooth_add(~duration=1., ~p=getter(0.2), ~normal, ~special)
+  #duration = fx_timing_spb()
+  p = getter.function(p)
+  last_p = ref(p())
+
+  def c(fn,s) =
+    def v() =
+      fn = fn()
+      fn()
+    end
+    fade.scale(v,s)
+  end
+
+  special_volume = ref(fun () -> 0.)
+  special = c(special_volume,special)
+
+  normal_volume = ref(fun () -> 1.)
+  normal = c(normal_volume,normal)
+
+  def to_special(_,special) =
+    s3type := true
+    log("s3type set to #{s3type()} - vox start")
+    last_p := p()
+    q = 1. - last_p()
+    normal_volume := mkfade(start=1.,stop=last_p(),duration=duration,normal)
+    special_volume := mkfade(stop=q,duration=duration,special)
+    special
+  end
+
+  def to_blank(special,b)
+    s3type := false
+    notPlayAlone := false
+    ambient_only := false
+    now_playing.add("vocal", {title = "silence", artist = "silence", source_url = ""})
+    log("s3type set to #{s3type()} - vox end")
+    normal_volume := mkfade(start=last_p(),duration=duration,normal)
+    special_volume := mkfade(start=1.-last_p(),duration=duration,special)
+    sequence([special,b])
+  end
+
+  special = fallback(track_sensitive=false,
+               transitions=[to_special,to_blank],
+               [special,blank()])
+
+  add(normalize=false,[normal,special])
+end
+
+#-------------------------
+
+music_mix_ratio = interactive.float("Music mix", description="Music mix", min=0.0, max=2.0, 1.0)
+field_mix_ratio = interactive.float("Field mix", description="Field mix", min=0.0, max=2.0, 0.6)
+vocal_mix_ratio = interactive.float("Voacl mix", description="Vocal mix", min=0.0, max=2.0, 1.0)
+vocal_fx_mix_ratio = interactive.float("Vocal Fx mix", description="Vocal Fx mix", min=0.0, max=2.0, 0.7)
+
+main_mix = add(normalize=true, weights=[music_mix_ratio, field_mix_ratio, vocal_fx_mix_ratio], [s1, s2, s4])
+
+submix = smooth_add(duration=4.0, p=0.5, normal=main_mix, special=s3)
+#submix = main_mix
+##### Add stream metadata for hls stream.
+
+thr = interactive.float("threshold (dB)", description="Main compressor threshold", min=-20., max=0., -1.0)
+gain = interactive.float("gain (dB)", description="Main compressor gain", min=-10., max=15., 1.0)
+rat = interactive.float("ratio (x:1)", description="Main compressor ratio", min=-0., max=6., 1.8)
+att = interactive.float("attack (ms)", description="Main compressor attack", min=-0., max=200., 100.)
+rel = interactive.float("release (ms)", description="Main compressor release", min=-0., max=1500., 6.0)
+knee = interactive.float("knee", description="Main compressor knee radius", min=-0., max=10., 0.0)
+
+mb_pre = ref(1.0)
+#multiband_pre_gain = interactive.float("Multiband pre gain (dB)", description="Multiband pre gain", min=-10., max=20., 1.)
+
+#thread.run(every=10.,{mb_pre := multiband_pre_gain()})
+
+#submix = amplify({mb_pre()}, override="no", submix)
+
+#submix = ladspa.sc4(attack_time=att, release_time=rel, knee_radius=knee, ratio=rat, makeup_gain=gain, threshold_level=thr, submix)
+#submix = ladspa.lsp_limiter_stereo(operating_mode=2, oversampling=10, gain_boost=false, submix)
+
+#submix = compress.exponential(mu=1.0, submix)
+#submix = limit(submix)
+
+seg_dur = ref(10)
+
+def segment_name(metadata) =
+  timestamp = int_of_float(time())
+  let {stream_name, duration, position, extname} = metadata
+  "#{stream_name}_#{duration}_#{timestamp}_#{position}.#{extname}"
+end
+
+def push_to_s3()
+  process.run("aws s3 sync /tmp/hls/ s3://millicent-audio-mirror/hls --delete")
+end
+
+submix = insert_metadata(submix)
+
+thread.run(every=0.5, {submix.insert_metadata([("title", json.stringify(get_now_playing_metadata()))])})
+#on_file_change=on_file_change,
+#clock(submix)
+
+#submix = lufs(submix)
+#thread.run(every=1.0, fun() -> print("lufs: #{submix.lufs()}"))
+
+# look at presets
+submix = stereotool(
+  library_file="/home/ubuntu/millicent/millicent_latest/stereotool/Stereo_Tool_Generic_plugin/libStereoTool_1051\lib\Linux\IntelAMD\64\libStereoTool_intel64.so",
+  preset="/home/ubuntu/millicent/millicent_latest/stereotool/millicent.sts",
+  submix)
+
+out = output.file.hls(playlist="live.m3u8",
+                segment_duration=float_of_int(seg_dur()),
+                segments=7,
+                segments_overhead=1,
+                segment_name=segment_name,
+                persist_at="/tmp/hls/state.config",
+                perm=0o755,
+                fallible=true,
+                "/tmp/hls",
+                [
+                  #("aac_lofi",
+                  #    %ffmpeg(format="mpegts", %audio(codec="aac", channels=2, ar=48000)).{
+                  #      id3_version=4
+                  #      }),
+                  ("aac_hifi",
+                      %ffmpeg(format="mpegts", %audio(codec="aac", channels=2, ar=48000, b="320k")).{
+                        id3_version=4
+                        })
+                ],
+                submix)
+
+def on_file_change({state, path = p})
+    fname = p
+    if state == "updated" and file.extension(fname) == ".m3u8" then
+        thread.run(push_to_s3)
+    end
+end
+
+out.on_file_change(synchronous=true, on_file_change)
+
+interactive.persistent("./comp.params")
+
+def metadata(_)
+http.response(data=json.stringify(get_delayed_now_playing_metadata()))
+end
+harbor.http.register.simple(port=8000, "/metadata", metadata)
