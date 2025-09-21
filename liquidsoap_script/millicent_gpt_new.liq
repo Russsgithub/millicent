@@ -123,7 +123,7 @@ end
 
 thread.when({0m}, is_dusk_dawn_calc)
 
-auth = ref(string.base64.encode("control:m1ll1c3nt"))
+auth = ref(string.base64.encode("xxxx:xxxx")) # 
 
 attempt_count_music = ref(0)
 
