@@ -1,2 +1,2 @@
 # millicent
-millicent liquidsoap script
+millicent audio mirror
